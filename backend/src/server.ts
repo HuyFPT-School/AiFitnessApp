@@ -1,8 +1,9 @@
+import { Request, Response } from 'express';
 import app from './app';
 
 const PORT = Number(process.env.PORT) || 5050;
 
-app.get('/', (_req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     name: 'AI FitCoach Backend API',
     status: 'ONLINE',

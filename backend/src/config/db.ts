@@ -18,10 +18,7 @@ export const connectDB = async (): Promise<typeof mongoose | null> => {
   if (!cachedPromise) {
     mongoose.set('strictQuery', false);
     cachedPromise = mongoose
-      .connect(mongoUri, {
-        serverSelectionTimeoutMS: 6000,
-        connectTimeoutMS: 6000
-      })
+      .connect(mongoUri)
       .then(m => {
         isDbConnected = true;
         console.log('✅ MongoDB Connected successfully');
