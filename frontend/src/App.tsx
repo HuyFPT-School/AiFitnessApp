@@ -11,13 +11,14 @@ import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/Auth/AuthModal';
 import { CreateExerciseModal } from './components/Admin/CreateExerciseModal';
 import { ExerciseInfo, UserSettings, UserProfile } from './types';
-import { EXERCISES } from './data/exercises';
 import { StorageService } from './services/storageService';
 import { audioCoach } from './engine/audioCoach';
+import { ApiClient } from './services/apiClient';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'studio' | 'plan' | 'nutrition' | 'library' | 'coach' | 'history'>('home');
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo>(EXERCISES[0]);
+  const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
   const [settings, setSettings] = useState<UserSettings>(StorageService.getSettings());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -27,6 +28,34 @@ export function App() {
   const [isMuted, setIsMuted] = useState(!settings.voiceCoachEnabled);
   const [historyCount, setHistoryCount] = useState(0);
   const [totalCalories, setTotalCalories] = useState(0);
+
+  // Load exercises 100% dynamically from MongoDB Atlas
+  useEffect(() => {
+    ApiClient.getExercises().then(res => {
+      if (res && Array.isArray(res) && res.length > 0) {
+        const formatted: ExerciseInfo[] = res.map(item => ({
+          id: (item._id || item.id) as any,
+          nameVi: item.nameVi,
+          nameEn: item.nameEn,
+          category: item.category || 'Legs',
+          difficulty: item.difficulty || 'Trung bình',
+          caloriesPerMinute: item.caloriesPerMinute || 8,
+          targetMuscles: item.targetMuscles || [],
+          iconName: item.iconName || 'Dumbbell',
+          description: item.description || '',
+          keyFormRules: item.keyFormRules || [],
+          commonMistakes: item.commonMistakes || [],
+          defaultTargetReps: item.defaultTargetReps || 12,
+          isHoldExercise: item.isHoldExercise,
+          idealHoldDurationSec: item.idealHoldDurationSec,
+          cameraAdvice: item.cameraAdvice || 'Đứng cách camera 2-3m để AI quan sát toàn thân.',
+          gifUrl: item.gifUrl
+        }));
+        setExercises(formatted);
+        setSelectedExercise(formatted[0]);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     // Sync stats
@@ -104,6 +133,7 @@ export function App() {
       <main className="flex-1 pb-12">
         {currentTab === 'home' && (
           <LandingPage
+            exercises={exercises}
             onStartWorkout={handleSelectAndStartExercise}
             onNavigateTab={setCurrentTab}
           />
@@ -111,7 +141,7 @@ export function App() {
 
         {currentTab === 'studio' && (
           <CameraView
-            selectedExercise={selectedExercise}
+            selectedExercise={selectedExercise || exercises[0]}
             onSelectExercise={setSelectedExercise}
             onOpenAiCoach={() => setCurrentTab('coach')}
           />
@@ -120,7 +150,7 @@ export function App() {
         {currentTab === 'plan' && (
           <WorkoutPlanGenerator
             onStartExerciseInStudio={handleStartExerciseFromRoutine}
-            availableExercises={EXERCISES}
+            availableExercises={exercises}
           />
         )}
 

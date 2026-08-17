@@ -15,7 +15,6 @@ import {
   X
 } from 'lucide-react';
 import { ExerciseInfo, ExerciseCategory, UserProfile } from '../../types';
-import { EXERCISES } from '../../data/exercises';
 import { ExerciseAnimation } from '../Common/ExerciseAnimation';
 import { CreateExerciseModal } from '../Admin/CreateExerciseModal';
 import { ApiClient } from '../../services/apiClient';
@@ -47,26 +46,6 @@ export const CATEGORY_MAP: Record<string, string> = {
   FullBody: 'Toàn Thân'
 };
 
-const PRIORITY_EXERCISE_ORDER = [
-  'squat',
-  'pushup',
-  'plank',
-  'lunge',
-  'bicep_curl',
-  'deadlift',
-  'shoulder_press',
-  'jumping_jack',
-  'warrior_yoga'
-];
-
-function getExercisePriority(idOrName: string): number {
-  const s = (idOrName || '').toLowerCase();
-  for (let i = 0; i < PRIORITY_EXERCISE_ORDER.length; i++) {
-    if (s.includes(PRIORITY_EXERCISE_ORDER[i])) return i;
-  }
-  return 999;
-}
-
 export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
   onSelectAndStart,
   currentUser,
@@ -76,14 +55,16 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalExercise, setActiveModalExercise] = useState<ExerciseInfo | null>(null);
   const [customExercises, setCustomExercises] = useState<ExerciseInfo[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCreateOrEditModalOpen, setIsCreateOrEditModalOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<ExerciseInfo | null>(null);
 
-  // Fetch exercises from MongoDB Atlas
+  // Fetch exercises 100% from MongoDB Atlas
   const loadExercises = async () => {
+    setIsLoading(true);
     try {
       const res = await ApiClient.getExercises();
-      if (res && Array.isArray(res) && res.length > 0) {
+      if (res && Array.isArray(res)) {
         const formatted: ExerciseInfo[] = res.map(item => ({
           id: (item._id || item.id) as any,
           nameVi: item.nameVi,
@@ -102,19 +83,14 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
           cameraAdvice: item.cameraAdvice || 'Đứng cách camera 2-3m để AI quan sát toàn thân.',
           gifUrl: item.gifUrl
         }));
-
-        const sorted = formatted.sort((a, b) => {
-          const prioA = getExercisePriority(a.id || a.nameVi);
-          const prioB = getExercisePriority(b.id || b.nameVi);
-          return prioA - prioB;
-        });
-
-        setCustomExercises(sorted);
+        setCustomExercises(formatted);
       } else {
-        setCustomExercises(EXERCISES);
+        setCustomExercises([]);
       }
     } catch {
-      setCustomExercises(EXERCISES);
+      setCustomExercises([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -122,7 +98,7 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
     loadExercises();
   }, []);
 
-  const allExercises = customExercises.length > 0 ? customExercises : EXERCISES;
+  const allExercises = customExercises;
 
   const handleDeleteExercise = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -216,15 +192,49 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
         </div>
       </div>
 
-      {/* Exercise Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {filteredExercises.map(exercise => {
-          return (
+      {/* Loading Skeleton */}
+      {isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
             <div
-              key={exercise.id}
-              onClick={() => setActiveModalExercise(exercise)}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#eab308]/50 hover:shadow-xl cursor-pointer"
+              key={i}
+              className="flex flex-col justify-between overflow-hidden rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 animate-pulse space-y-4"
             >
+              <div className="aspect-[4/3] w-full rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
+              <div className="space-y-2">
+                <div className="h-4 w-1/3 rounded bg-neutral-200 dark:bg-neutral-800" />
+                <div className="h-5 w-3/4 rounded bg-neutral-200 dark:bg-neutral-800" />
+                <div className="h-3 w-full rounded bg-neutral-200 dark:bg-neutral-800" />
+              </div>
+              <div className="h-9 w-full rounded-xl bg-neutral-200 dark:bg-neutral-800" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && filteredExercises.length === 0 && (
+        <div className="text-center py-16 space-y-3 rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-8">
+          <Target className="h-12 w-12 mx-auto text-[var(--text-muted)] animate-bounce" />
+          <h3 className="font-heading text-lg font-bold text-[var(--text-primary)]">
+            Không tìm thấy bài tập phù hợp
+          </h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+            Không có bài tập nào trên MongoDB Atlas khớp với từ khóa tìm kiếm hoặc danh mục đã chọn.
+          </p>
+        </div>
+      )}
+
+      {/* Exercise Grid from MongoDB Atlas */}
+      {!isLoading && filteredExercises.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filteredExercises.map(exercise => {
+            return (
+              <div
+                key={exercise.id}
+                onClick={() => setActiveModalExercise(exercise)}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[#eab308]/50 hover:shadow-xl cursor-pointer"
+              >
               {/* Exercise 3D/Anatomical Animation */}
               <div className="relative mb-4 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-inset)]">
                 <ExerciseAnimation
@@ -334,6 +344,7 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* Modal Detailed Exercise Guide */}
       {activeModalExercise && (

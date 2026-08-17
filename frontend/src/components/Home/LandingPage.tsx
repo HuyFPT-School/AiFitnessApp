@@ -18,16 +18,17 @@ import {
   Lightbulb
 } from 'lucide-react';
 import { ExerciseInfo } from '../../types';
-import { EXERCISES } from '../../data/exercises';
 import { HeroAiScannerAnimation } from './HeroAiScannerAnimation';
 import { ExerciseAnimation } from '../Common/ExerciseAnimation';
 
 interface LandingPageProps {
+  exercises?: ExerciseInfo[];
   onStartWorkout: (exercise?: ExerciseInfo) => void;
   onNavigateTab: (tab: 'studio' | 'plan' | 'nutrition' | 'library' | 'coach' | 'history') => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
+  exercises = [],
   onStartWorkout,
   onNavigateTab
 }) => {
@@ -197,7 +198,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {EXERCISES.map(exercise => (
+          {exercises.slice(0, 4).map(exercise => (
             <div
               key={exercise.id}
               className="group card-impeccable flex flex-col justify-between p-5"
@@ -205,7 +206,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div>
                 {/* 3D Exercise Animation Container (Seamless Harmonized Blend) */}
                 <div className="mb-4 flex items-center justify-center">
-                  <ExerciseAnimation exerciseId={exercise.id} size="md" />
+                  <ExerciseAnimation
+                    exerciseId={exercise.id}
+                    exerciseName={exercise.nameVi || exercise.nameEn}
+                    gifUrl={exercise.gifUrl}
+                    size="md"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between text-xs mb-1.5">
