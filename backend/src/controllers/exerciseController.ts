@@ -10,7 +10,7 @@ const inMemoryExercises: any[] = [];
 export const getExercises = async (req: Request, res: Response): Promise<void> => {
   try {
     if (isDbConnected) {
-      const exercises = await Exercise.find().sort({ createdAt: -1 });
+      const exercises = await Exercise.find().sort({ createdAt: 1 });
       res.json({ success: true, count: exercises.length, data: exercises });
       return;
     }

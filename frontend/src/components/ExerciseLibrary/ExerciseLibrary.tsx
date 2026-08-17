@@ -47,6 +47,26 @@ export const CATEGORY_MAP: Record<string, string> = {
   FullBody: 'Toàn Thân'
 };
 
+const PRIORITY_EXERCISE_ORDER = [
+  'squat',
+  'pushup',
+  'plank',
+  'lunge',
+  'bicep_curl',
+  'deadlift',
+  'shoulder_press',
+  'jumping_jack',
+  'warrior_yoga'
+];
+
+function getExercisePriority(idOrName: string): number {
+  const s = (idOrName || '').toLowerCase();
+  for (let i = 0; i < PRIORITY_EXERCISE_ORDER.length; i++) {
+    if (s.includes(PRIORITY_EXERCISE_ORDER[i])) return i;
+  }
+  return 999;
+}
+
 export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
   onSelectAndStart,
   currentUser,
@@ -82,7 +102,14 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
           cameraAdvice: item.cameraAdvice || 'Đứng cách camera 2-3m để AI quan sát toàn thân.',
           gifUrl: item.gifUrl
         }));
-        setCustomExercises(formatted);
+
+        const sorted = formatted.sort((a, b) => {
+          const prioA = getExercisePriority(a.id || a.nameVi);
+          const prioB = getExercisePriority(b.id || b.nameVi);
+          return prioA - prioB;
+        });
+
+        setCustomExercises(sorted);
       } else {
         setCustomExercises(EXERCISES);
       }
