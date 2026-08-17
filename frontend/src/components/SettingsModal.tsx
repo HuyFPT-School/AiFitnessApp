@@ -41,7 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleResetDefaults = () => {
     const defaults: UserSettings = {
-      geminiApiKey: 'AIzaSyA7mjSYqhM-vgzL1vX6nmQFlX9sovZSG5g',
+      geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
       voiceCoachEnabled: true,
       repSoundEnabled: true,
       voiceSpeed: 1.05,

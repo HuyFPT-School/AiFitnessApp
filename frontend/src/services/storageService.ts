@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  geminiApiKey: 'AIzaSyA7mjSYqhM-vgzL1vX6nmQFlX9sovZSG5g',
+  geminiApiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || '',
   voiceCoachEnabled: true,
   repSoundEnabled: true,
   voiceSpeed: 1.05,
@@ -62,6 +62,9 @@ export class StorageService {
       const stored = localStorage.getItem(`${STORAGE_KEYS.SETTINGS}_${this.getUserScope()}`) || localStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (!parsed.geminiApiKey) {
+          parsed.geminiApiKey = DEFAULT_SETTINGS.geminiApiKey;
+        }
         if (user) {
           if (user.dailyCalorieTarget) parsed.dailyCalorieTarget = user.dailyCalorieTarget;
           if (user.dailyProteinTarget) parsed.dailyProteinTarget = user.dailyProteinTarget;
