@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Activity,
   Bot,
   Volume2,
   Sparkles,

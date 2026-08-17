@@ -2,20 +2,32 @@ import { Request, Response } from 'express';
 import { Exercise, IExercise } from '../models/Exercise';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { isDbConnected } from '../config/db';
+import { getCache, setCache, flushCachePattern } from '../config/redis';
 
 const inMemoryExercises: any[] = [];
+const EXERCISES_CACHE_KEY = 'cache:exercises:all';
 
-// @desc    Get all exercises
+// @desc    Get all exercises (with Redis Caching)
 // @route   GET /api/exercises
 export const getExercises = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (isDbConnected) {
-      const exercises = await Exercise.find().sort({ createdAt: 1 });
-      res.json({ success: true, count: exercises.length, data: exercises });
+    // 1. Check Redis Cache
+    const cachedExercises = await getCache<any[]>(EXERCISES_CACHE_KEY);
+    if (cachedExercises && Array.isArray(cachedExercises) && cachedExercises.length > 0) {
+      res.json({ success: true, count: cachedExercises.length, data: cachedExercises, cached: true });
       return;
     }
 
-    res.json({ success: true, count: inMemoryExercises.length, data: inMemoryExercises });
+    // 2. Query MongoDB Atlas if cache miss
+    if (isDbConnected) {
+      const exercises = await Exercise.find().sort({ createdAt: 1 });
+      // Cache for 1 hour (3600 seconds)
+      await setCache(EXERCISES_CACHE_KEY, exercises, 3600);
+      res.json({ success: true, count: exercises.length, data: exercises, cached: false });
+      return;
+    }
+
+    res.json({ success: true, count: inMemoryExercises.length, data: inMemoryExercises, cached: false });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -84,6 +96,8 @@ export const createExercise = async (req: AuthRequest, res: Response): Promise<v
 
     if (isDbConnected) {
       const newExercise = await Exercise.create(exerciseData);
+      // Invalidate exercises cache
+      await flushCachePattern('cache:exercises*');
       res.status(201).json({
         success: true,
         message: 'Tạo bài tập AI FitCoach mới thành công!',
@@ -100,6 +114,7 @@ export const createExercise = async (req: AuthRequest, res: Response): Promise<v
       updatedAt: new Date()
     };
     inMemoryExercises.unshift(memExercise);
+    await flushCachePattern('cache:exercises*');
 
     res.status(201).json({
       success: true,
@@ -140,6 +155,8 @@ export const updateExercise = async (req: AuthRequest, res: Response): Promise<v
         res.status(404).json({ success: false, message: 'Không tìm thấy bài tập.' });
         return;
       }
+      // Invalidate exercises cache
+      await flushCachePattern('cache:exercises*');
       res.json({ success: true, message: 'Cập nhật bài tập thành công!', data: updated });
       return;
     }
@@ -150,6 +167,7 @@ export const updateExercise = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
     inMemoryExercises[index] = { ...inMemoryExercises[index], ...updates, updatedAt: new Date() };
+    await flushCachePattern('cache:exercises*');
     res.json({ success: true, message: 'Cập nhật bài tập thành công!', data: inMemoryExercises[index] });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -168,6 +186,8 @@ export const deleteExercise = async (req: AuthRequest, res: Response): Promise<v
         res.status(404).json({ success: false, message: 'Không tìm thấy bài tập.' });
         return;
       }
+      // Invalidate exercises cache
+      await flushCachePattern('cache:exercises*');
       res.json({ success: true, message: 'Đã xóa bài tập thành công!' });
       return;
     }
@@ -178,6 +198,7 @@ export const deleteExercise = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
     inMemoryExercises.splice(index, 1);
+    await flushCachePattern('cache:exercises*');
     res.json({ success: true, message: 'Đã xóa bài tập thành công!' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

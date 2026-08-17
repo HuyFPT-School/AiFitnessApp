@@ -16,3 +16,5 @@ services:
         sync: false
       - key: CLIENT_URL
         value: '*'
+      - key: REDIS_URL
+        sync: false

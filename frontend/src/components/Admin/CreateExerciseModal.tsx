@@ -4,7 +4,6 @@ import {
   Plus,
   Dumbbell,
   Sparkles,
-  Flame,
   Zap,
   Activity,
   CheckCircle2,

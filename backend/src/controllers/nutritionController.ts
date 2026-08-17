@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { MealLog } from '../models/MealLog';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { isDbConnected } from '../config/db';
+import { getCache, setCache, flushCachePattern } from '../config/redis';
 
 const inMemoryMeals: any[] = [];
 
@@ -37,9 +38,13 @@ export const logMeal = async (req: AuthRequest, res: Response): Promise<void> =>
       imageBase64
     };
 
+    const userId = req.user?._id ? String(req.user._id) : 'guest';
+
     if (isDbConnected) {
       try {
         const meal = await MealLog.create(mealData);
+        await flushCachePattern(`cache:nutrition:${userId}*`);
+        await flushCachePattern(`cache:meals:${userId}*`);
         res.status(201).json({ success: true, data: meal });
         return;
       } catch (dbErr) {
@@ -49,53 +54,75 @@ export const logMeal = async (req: AuthRequest, res: Response): Promise<void> =>
 
     const mockMeal = { ...mealData, _id: 'mem_meal_' + Date.now(), createdAt: new Date() };
     inMemoryMeals.unshift(mockMeal);
+    await flushCachePattern(`cache:nutrition:${userId}*`);
+    await flushCachePattern(`cache:meals:${userId}*`);
     res.status(201).json({ success: true, data: mockMeal });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// @desc    Get all meals history
+// @desc    Get all meals history (with Redis Caching)
 // @route   GET /api/nutrition/meals
 export const getMeals = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const userId = req.user?._id ? String(req.user._id) : 'guest';
+    const cacheKey = `cache:meals:${userId}`;
+
+    // 1. Check Redis Cache
+    const cachedMeals = await getCache<any[]>(cacheKey);
+    if (cachedMeals && Array.isArray(cachedMeals)) {
+      res.json({ success: true, count: cachedMeals.length, data: cachedMeals, cached: true });
+      return;
+    }
+
     let meals = [];
-    const userId = req.user?._id;
-    const filter = userId ? { user: userId } : { user: null };
+    const filter = req.user?._id ? { user: req.user._id } : { user: null };
 
     if (isDbConnected) {
       try {
         meals = await MealLog.find(filter).sort({ timestamp: -1 }).limit(100);
       } catch {
-        meals = inMemoryMeals.filter(m => (userId ? String(m.user) === String(userId) : !m.user));
+        meals = inMemoryMeals.filter(m => (req.user?._id ? String(m.user) === String(req.user._id) : !m.user));
       }
     } else {
-      meals = inMemoryMeals.filter(m => (userId ? String(m.user) === String(userId) : !m.user));
+      meals = inMemoryMeals.filter(m => (req.user?._id ? String(m.user) === String(req.user._id) : !m.user));
     }
 
-    res.json({ success: true, count: meals.length, data: meals });
+    await setCache(cacheKey, meals, 300);
+
+    res.json({ success: true, count: meals.length, data: meals, cached: false });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// @desc    Get daily nutrition summary and breakdown
+// @desc    Get daily nutrition summary and breakdown (with Redis Caching)
 // @route   GET /api/nutrition/daily?date=YYYY-MM-DD
 export const getDailyNutrition = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const targetDate = (req.query.date as string) || new Date().toISOString().split('T')[0];
-    const userId = req.user?._id;
-    const filter: any = { date: targetDate, user: userId ? userId : null };
+    const userId = req.user?._id ? String(req.user._id) : 'guest';
+    const cacheKey = `cache:nutrition:${userId}:${targetDate}`;
+
+    // 1. Check Redis Cache
+    const cachedSummary = await getCache<any>(cacheKey);
+    if (cachedSummary) {
+      res.json({ success: true, data: cachedSummary, cached: true });
+      return;
+    }
+
+    const filter: any = { date: targetDate, user: req.user?._id ? req.user._id : null };
 
     let dayMeals = [];
     if (isDbConnected) {
       try {
         dayMeals = await MealLog.find(filter).sort({ timestamp: -1 });
       } catch {
-        dayMeals = inMemoryMeals.filter(m => m.date === targetDate && (userId ? String(m.user) === String(userId) : !m.user));
+        dayMeals = inMemoryMeals.filter(m => m.date === targetDate && (req.user?._id ? String(m.user) === String(req.user._id) : !m.user));
       }
     } else {
-      dayMeals = inMemoryMeals.filter(m => m.date === targetDate && (userId ? String(m.user) === String(userId) : !m.user));
+      dayMeals = inMemoryMeals.filter(m => m.date === targetDate && (req.user?._id ? String(m.user) === String(req.user._id) : !m.user));
     }
 
     const totalCalories = dayMeals.reduce((sum, m) => sum + (m.calories || 0), 0);
@@ -109,26 +136,32 @@ export const getDailyNutrition = async (req: AuthRequest, res: Response): Promis
     const targetCarbs = req.user?.dailyCarbsTarget || 220;
     const targetFat = req.user?.dailyFatTarget || 55;
 
+    const nutritionData = {
+      date: targetDate,
+      targetCalories,
+      totalCalories,
+      remainingCalories: Math.max(0, targetCalories - totalCalories),
+      targetMacros: {
+        protein: targetProtein,
+        carbs: targetCarbs,
+        fat: targetFat
+      },
+      consumedMacros: {
+        protein: Math.round(consumedProtein * 10) / 10,
+        carbs: Math.round(consumedCarbs * 10) / 10,
+        fat: Math.round(consumedFat * 10) / 10,
+        fiber: Math.round(consumedFiber * 10) / 10
+      },
+      meals: dayMeals
+    };
+
+    // Cache for 300 seconds
+    await setCache(cacheKey, nutritionData, 300);
+
     res.json({
       success: true,
-      data: {
-        date: targetDate,
-        targetCalories,
-        totalCalories,
-        remainingCalories: Math.max(0, targetCalories - totalCalories),
-        targetMacros: {
-          protein: targetProtein,
-          carbs: targetCarbs,
-          fat: targetFat
-        },
-        consumedMacros: {
-          protein: Math.round(consumedProtein * 10) / 10,
-          carbs: Math.round(consumedCarbs * 10) / 10,
-          fat: Math.round(consumedFat * 10) / 10,
-          fiber: Math.round(consumedFiber * 10) / 10
-        },
-        meals: dayMeals
-      }
+      data: nutritionData,
+      cached: false
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -140,6 +173,8 @@ export const getDailyNutrition = async (req: AuthRequest, res: Response): Promis
 export const deleteMeal = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user?._id ? String(req.user._id) : 'guest';
+
     if (isDbConnected) {
       try {
         await MealLog.findByIdAndDelete(id);
@@ -149,6 +184,9 @@ export const deleteMeal = async (req: AuthRequest, res: Response): Promise<void>
     }
     const idx = inMemoryMeals.findIndex(m => m._id === id);
     if (idx !== -1) inMemoryMeals.splice(idx, 1);
+
+    await flushCachePattern(`cache:nutrition:${userId}*`);
+    await flushCachePattern(`cache:meals:${userId}*`);
 
     res.json({ success: true, message: 'Đã xóa bữa ăn khỏi nhật ký.' });
   } catch (err: any) {

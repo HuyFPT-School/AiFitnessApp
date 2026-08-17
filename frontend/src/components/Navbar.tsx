@@ -18,8 +18,6 @@ import {
   ChevronDown,
   Target,
   Mail,
-  ShieldCheck,
-  Sparkles,
   Calendar,
   Crown
 } from 'lucide-react';

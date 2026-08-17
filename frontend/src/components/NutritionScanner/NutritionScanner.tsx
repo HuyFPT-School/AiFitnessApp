@@ -7,21 +7,13 @@ import {
   Utensils,
   CheckCircle2,
   PlusCircle,
-  Clock,
-  ArrowRight,
   RefreshCw,
   Trash2,
   Play,
   Heart,
   Image as ImageIcon,
-  Zap,
   Target,
   Scale,
-  Activity,
-  Sliders,
-  Award,
-  Layers,
-  ChevronDown,
   Info
 } from 'lucide-react';
 import {
@@ -730,37 +722,45 @@ export const NutritionScanner: React.FC<NutritionScannerProps> = ({ onStartExerc
               </div>
 
               {/* Total Calorie & Macros Dashboard */}
-              <div className="grid grid-cols-4 gap-2 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] p-4 text-center font-mono shadow-xs">
+              <div className="grid grid-cols-5 gap-2 rounded-2xl bg-[var(--bg-canvas)] border border-[var(--border-subtle)] p-3 sm:p-4 text-center font-mono shadow-xs">
                 <div>
                   <span className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">TỔNG CALO</span>
-                  <p className="font-heading text-2xl sm:text-3xl font-extrabold text-orange-600 dark:text-orange-400">
+                  <p className="font-heading text-xl sm:text-2xl font-extrabold text-orange-600 dark:text-orange-400">
                     {activeCalories}
                   </p>
-                  <span className="text-[10px] text-[var(--text-muted)]">kcal</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">kcal</span>
                 </div>
 
                 <div className="border-l border-[var(--border-subtle)]">
                   <span className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">PROTEIN</span>
-                  <p className="font-heading text-xl sm:text-2xl font-extrabold text-[#0d9488]">
+                  <p className="font-heading text-lg sm:text-xl font-extrabold text-[#0d9488]">
                     {activeProtein}g
                   </p>
-                  <span className="text-[10px] text-[var(--text-muted)]">Đạm</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">Đạm</span>
                 </div>
 
                 <div className="border-l border-[var(--border-subtle)]">
                   <span className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">CARBS</span>
-                  <p className="font-heading text-xl sm:text-2xl font-extrabold text-amber-600 dark:text-amber-400">
+                  <p className="font-heading text-lg sm:text-xl font-extrabold text-amber-600 dark:text-amber-400">
                     {activeCarbs}g
                   </p>
-                  <span className="text-[10px] text-[var(--text-muted)]">Đường bột</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">Đường bột</span>
                 </div>
 
                 <div className="border-l border-[var(--border-subtle)]">
                   <span className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">FAT</span>
-                  <p className="font-heading text-xl sm:text-2xl font-extrabold text-rose-600 dark:text-rose-400">
+                  <p className="font-heading text-lg sm:text-xl font-extrabold text-rose-600 dark:text-rose-400">
                     {activeFat}g
                   </p>
-                  <span className="text-[10px] text-[var(--text-muted)]">Chất béo</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">Chất béo</span>
+                </div>
+
+                <div className="border-l border-[var(--border-subtle)]">
+                  <span className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">FIBER</span>
+                  <p className="font-heading text-lg sm:text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {activeFiber}g
+                  </p>
+                  <span className="text-[9px] text-[var(--text-muted)]">Chất xơ</span>
                 </div>
               </div>
 

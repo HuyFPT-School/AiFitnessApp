@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sliders, Mic, Eye, CheckCircle2, RotateCcw, Sparkles, Volume2, Utensils } from 'lucide-react';
+import { X, Sliders, Mic, Eye, CheckCircle2, RotateCcw, Volume2, Utensils } from 'lucide-react';
 import { UserSettings } from '../types';
 import { StorageService } from '../services/storageService';
 import { audioCoach, SUPPORTED_LANGUAGES } from '../engine/audioCoach';
