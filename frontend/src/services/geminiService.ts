@@ -2,7 +2,10 @@ import {
   GeminiAnalysisResult,
   WorkoutSessionSummary,
   ChatMessage,
-  FoodScanResult
+  FoodScanResult,
+  WorkoutRoutineInput,
+  WorkoutRoutine,
+  RoutineExerciseItem
 } from '../types';
 import { StorageService } from './storageService';
 import { ApiClient } from './apiClient';
@@ -511,4 +514,321 @@ YÊU CẦU TRẢ VỀ JSON THUẦN TÚY (Strict JSON Schema):
       imageBase64
     };
   }
+
+  /**
+   * AI Workout Routine Generator (3 Phases: Warm-up, Main Workout, Cool-down)
+   */
+  public static async generatePersonalizedRoutine(input: WorkoutRoutineInput): Promise<WorkoutRoutine> {
+    const apiKey = this.getApiKey();
+
+    const goalLabelMap: Record<string, string> = {
+      hypertrophy: 'Tăng cơ săn chắc & Nét khối',
+      hiit: 'Đốt mỡ siêu tốc & Sức bền tim mạch',
+      posture: 'Chỉnh dáng & Chống gù lưng',
+      abs: 'Săn chắc cơ bụng 6 múi & Cơ liên sườn',
+      mobility: 'Dẻo dai bao hoạt dịch & Phục hồi cơ'
+    };
+
+    const levelLabelMap: Record<string, string> = {
+      beginner: 'Người mới bắt đầu',
+      intermediate: 'Trung cấp (3-6 tháng)',
+      advanced: 'Nâng cao (Athlete)'
+    };
+
+    const focusAreaMap: Record<string, string> = {
+      fullbody: 'Toàn thân (Full Body)',
+      lower: 'Thân dưới (Mông - Đùi)',
+      upper: 'Thân trên (Ngực - Tay - Vai)',
+      core: 'Cơ bụng & Cơ lõi (Core & Abs)'
+    };
+
+    const systemPrompt = `
+Bạn là AI Personal Trainer Master hàng đầu thế giới (chuẩn NSCA/NASM/ACSM). Hãy thiết kế giáo án thể hình 3 giai đoạn:
+1. Warm-up (Khởi động) 2-3 phút
+2. Main Workout (Khối bài tập chính với camera AI)
+3. Cool-down (Giãn cơ hạ nhiệt) 2-3 phút
+
+THÔNG TIN HỌC VIÊN:
+- Mục tiêu: ${goalLabelMap[input.goal] || input.goal}
+- Trình độ: ${levelLabelMap[input.fitnessLevel] || input.fitnessLevel}
+- Thời lượng: ${input.durationMinutes} phút
+- Nhóm cơ: ${focusAreaMap[input.focusArea] || input.focusArea}
+
+BÀI TẬP CÓ SẴN TRONG HỆ THỐNG AI:
+- 'squat': Squat (Gánh Đùi)
+- 'pushup': Push-up (Hít Đất)
+- 'plank': Plank (Đo Ván Giữ Cố Định)
+- 'lunge': Lunge (Chùng Chân)
+- 'bicep_curl': Bicep Curl (Cuốn Tay Trước)
+- 'jumping_jack': Jumping Jack (Nhảy Bật Tay Chân)
+- 'shoulder_press': Shoulder Press (Đẩy Vai)
+- 'warrior_yoga': Warrior II (Chiến Binh Yoga)
+- 'deadlift': Romanian Deadlift (Kéo Tạ Đùi Sau & Mông)
+
+TRẢ VỀ JSON DUY NHẤT THEO SCHEMA:
+{
+  "title": "Tên giáo án ấn tượng",
+  "goal": "${goalLabelMap[input.goal] || input.goal}",
+  "level": "${levelLabelMap[input.fitnessLevel] || input.fitnessLevel}",
+  "durationMinutes": ${input.durationMinutes},
+  "estimatedCalories": 220,
+  "overview": "Mô tả ngắn gọn 2 câu về lợi ích khoa học của giáo án này.",
+  "warmUp": [
+    { "name": "Tên bài khởi động", "durationSeconds": 60, "instruction": "Hướng dẫn thực hiện ngắn gọn" }
+  ],
+  "mainRoutine": [
+    {
+      "exerciseId": "squat",
+      "exerciseName": "Squat (Gánh Đùi)",
+      "exerciseNameEn": "Bodyweight Squat",
+      "sets": 3,
+      "reps": 15,
+      "isHold": false,
+      "restSeconds": 45,
+      "formCue": "Mẹo then chốt giữ form chuẩn",
+      "targetMuscle": "Cơ đùi & Mông"
+    }
+  ],
+  "coolDown": [
+    { "name": "Tên động tác giãn cơ tĩnh", "durationSeconds": 45, "instruction": "Hướng dẫn kéo giãn và thở đều" }
+  ],
+  "coachTip": "Lời khuyên dinh dưỡng & phục hồi từ HLV AI sau buổi tập"
 }
+`;
+
+    if (apiKey) {
+      try {
+        const data = await this.executeGemini(
+          {
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+          },
+          apiKey
+        );
+
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const cleaned = rawText.replace(/```json\n?|\n?```/g, '').trim();
+          const parsed = JSON.parse(cleaned);
+          return {
+            title: parsed.title || `Giáo Án ${goalLabelMap[input.goal] || 'Toàn Thân'} ${input.durationMinutes} Phút`,
+            goal: parsed.goal || parsed.targetGoal || goalLabelMap[input.goal] || 'Tăng cơ giảm mỡ',
+            level: parsed.level || parsed.difficulty || levelLabelMap[input.fitnessLevel] || 'Người mới bắt đầu',
+            durationMinutes: Number(parsed.durationMinutes || parsed.estimatedDurationMinutes) || input.durationMinutes,
+            estimatedCalories: Number(parsed.estimatedCalories || parsed.estimatedCaloriesBurn) || 210,
+            overview: parsed.overview || 'Giáo án thiết kế theo phương pháp khoa học kích hoạt các nhóm cơ lớn nhất cơ thể.',
+            warmUp: Array.isArray(parsed.warmUp) ? parsed.warmUp : [],
+            mainRoutine: Array.isArray(parsed.mainRoutine || parsed.mainWorkout)
+              ? (parsed.mainRoutine || parsed.mainWorkout).map((item: any) => ({
+                  exerciseId: item.exerciseId || 'squat',
+                  exerciseName: item.exerciseName || item.nameVi || item.name || 'Squat (Gánh Đùi)',
+                  exerciseNameEn: item.exerciseNameEn || item.nameEn || 'Bodyweight Squat',
+                  sets: Number(item.sets) || 3,
+                  reps: typeof item.reps === 'number' ? item.reps : parseInt(item.repsOrSeconds || '12', 10) || 12,
+                  isHold: item.isHold ?? (item.exerciseId === 'plank' || item.exerciseId === 'warrior_yoga'),
+                  restSeconds: Number(item.restSeconds) || 45,
+                  formCue: item.formCue || 'Kiểm soát nhịp thở và siết chặt cơ bắp trong suốt hiệp tập.',
+                  targetMuscle: item.targetMuscle || 'Toàn thân',
+                  gifUrl: item.gifUrl
+                }))
+              : [],
+            coolDown: Array.isArray(parsed.coolDown) ? parsed.coolDown : [],
+            coachTip: parsed.coachTip || 'Uống đủ nước và bổ sung đạm trong vòng 45 phút sau tập để cơ bắp phục hồi nhanh nhất.'
+          };
+        }
+      } catch (err) {
+        console.warn('Gemini routine generation API error, using smart scientific fallback:', err);
+      }
+    }
+
+    return this.getLocalRoutine(input);
+  }
+
+  private static getLocalRoutine(input: WorkoutRoutineInput): WorkoutRoutine {
+    const isUpper = input.focusArea === 'upper';
+    const isLower = input.focusArea === 'lower';
+    const isCore = input.focusArea === 'core';
+
+    let mainList: RoutineExerciseItem[] = [];
+
+    if (isUpper) {
+      mainList = [
+        {
+          exerciseId: 'pushup',
+          exerciseName: 'Push-up (Hít Đất)',
+          exerciseNameEn: 'Standard Push-up',
+          sets: 3,
+          reps: input.fitnessLevel === 'advanced' ? 20 : input.fitnessLevel === 'intermediate' ? 15 : 10,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Cùi chỏ chếch góc 45 độ so với thân, siết mông và bụng tạo đường thẳng.',
+          targetMuscle: 'Cơ ngực & Tay sau',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0426-A6wtbuL.gif'
+        },
+        {
+          exerciseId: 'shoulder_press',
+          exerciseName: 'Shoulder Press (Đẩy Vai)',
+          exerciseNameEn: 'Dumbbell Shoulder Press',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Đẩy tạ qua đầu thẳng hàng với thân, không ưỡn cong thắt lưng.',
+          targetMuscle: 'Cơ vai trước & Vai giữa',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0306-UaV9bZ2.gif'
+        },
+        {
+          exerciseId: 'bicep_curl',
+          exerciseName: 'Bicep Curl (Cuốn Tay Trước)',
+          exerciseNameEn: 'Standing Bicep Curl',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 40,
+          formCue: 'Cố định cùi chỏ sát mạn sườn, siết chặt bắp tay ở đỉnh chuyển động.',
+          targetMuscle: 'Cơ tay trước (Biceps)',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0285-LdJ0y3B.gif'
+        }
+      ];
+    } else if (isLower) {
+      mainList = [
+        {
+          exerciseId: 'squat',
+          exerciseName: 'Squat (Gánh Đùi)',
+          exerciseNameEn: 'Bodyweight Squat',
+          sets: 3,
+          reps: input.fitnessLevel === 'advanced' ? 25 : input.fitnessLevel === 'intermediate' ? 18 : 12,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Mở rộng ngực, đẩy gối theo hướng mũi chân, hạ đùi song song mặt đất.',
+          targetMuscle: 'Cơ đùi trước & Cơ mông',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/3220-f9lVSSI.gif'
+        },
+        {
+          exerciseId: 'lunge',
+          exerciseName: 'Lunge (Chùng Chân)',
+          exerciseNameEn: 'Walking Lunge',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Bước dài chân tới trước, hạ gối sau vuông góc sàn, giữ thân người thẳng.',
+          targetMuscle: 'Cơ đùi & Mông',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/1775-VO2qeJg.gif'
+        },
+        {
+          exerciseId: 'deadlift',
+          exerciseName: 'Romanian Deadlift (Kéo Tạ Đùi Sau)',
+          exerciseNameEn: 'Romanian Deadlift',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 50,
+          formCue: 'Đẩy mông ra sau, giữ lưng thẳng tuyệt đối, cảm nhận căng cơ đùi sau.',
+          targetMuscle: 'Cơ đùi sau & Cơ mông',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0401-yG0vK4Q.gif'
+        }
+      ];
+    } else if (isCore) {
+      mainList = [
+        {
+          exerciseId: 'plank',
+          exerciseName: 'Plank (Đo Ván Giữ Cố Định)',
+          exerciseNameEn: 'Forearm Plank',
+          sets: 3,
+          reps: input.fitnessLevel === 'advanced' ? 60 : input.fitnessLevel === 'intermediate' ? 45 : 30,
+          isHold: true,
+          restSeconds: 30,
+          formCue: 'Gồng cứng cơ bụng, siết mông, giữ thân người tạo thành 1 đường thẳng tắp.',
+          targetMuscle: 'Cơ lõi (Core & Abs)',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0426-A6wtbuL.gif'
+        },
+        {
+          exerciseId: 'squat',
+          exerciseName: 'Squat (Gánh Đùi Kích Hoạt Core)',
+          exerciseNameEn: 'Bodyweight Squat',
+          sets: 3,
+          reps: 15,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Hít sâu gồng bụng trước khi hạ người xuống đáy.',
+          targetMuscle: 'Cơ bụng & Thân dưới',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/3220-f9lVSSI.gif'
+        }
+      ];
+    } else {
+      // Full Body default
+      mainList = [
+        {
+          exerciseId: 'squat',
+          exerciseName: 'Squat (Gánh Đùi)',
+          exerciseNameEn: 'Bodyweight Squat',
+          sets: 3,
+          reps: 15,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Đẩy gối theo mũi chân, mở rộng lồng ngực và hạ đùi song song mặt sàn.',
+          targetMuscle: 'Cơ đùi trước & Cơ mông',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/3220-f9lVSSI.gif'
+        },
+        {
+          exerciseId: 'pushup',
+          exerciseName: 'Push-up (Hít Đất)',
+          exerciseNameEn: 'Standard Push-up',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Cùi chỏ chếch góc 45 độ so với thân, siết mông và bụng tạo đường thẳng.',
+          targetMuscle: 'Cơ ngực & Tay sau',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0426-A6wtbuL.gif'
+        },
+        {
+          exerciseId: 'lunge',
+          exerciseName: 'Lunge (Chùng Chân)',
+          exerciseNameEn: 'Walking Lunge',
+          sets: 3,
+          reps: 12,
+          isHold: false,
+          restSeconds: 45,
+          formCue: 'Bước dài chân tới trước, hạ gối sau vuông góc sàn, giữ thân người thẳng.',
+          targetMuscle: 'Cơ đùi & Thăng bằng',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/1775-VO2qeJg.gif'
+        },
+        {
+          exerciseId: 'plank',
+          exerciseName: 'Plank (Đo Ván Giữ Cố Định)',
+          exerciseNameEn: 'Forearm Plank',
+          sets: 3,
+          reps: 45,
+          isHold: true,
+          restSeconds: 30,
+          formCue: 'Gồng chặt toàn bộ cơ bụng, không võng lưng hay nhô mông cao.',
+          targetMuscle: 'Cơ lõi (Core)',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0426-A6wtbuL.gif'
+        }
+      ];
+    }
+
+    return {
+      title: `Giáo Án ${input.focusArea === 'upper' ? 'Thân Trên' : input.focusArea === 'lower' ? 'Thân Dưới' : input.focusArea === 'core' ? 'Cơ Bụng' : 'Toàn Thân'} Chuẩn Khoa Học ${input.durationMinutes} Phút`,
+      goal: input.goal || 'Tăng cơ giảm mỡ',
+      level: input.fitnessLevel || 'Người mới bắt đầu',
+      durationMinutes: input.durationMinutes,
+      estimatedCalories: Math.round(input.durationMinutes * 11),
+      overview:
+        'Giáo án thiết kế theo phương pháp Compound Overload kích hoạt các chuỗi cơ lớn, tối ưu hóa quá trình đốt mỡ và tăng trưởng sợi cơ nạc.',
+      warmUp: [
+        { name: 'Xoay khớp cổ tay, cổ chân & khớp vai', durationSeconds: 60, instruction: 'Xoay tròn nhẹ nhàng làm trơn bao hoạt dịch khớp.' },
+        { name: 'Jumping Jacks kích hoạt nhịp tim', durationSeconds: 45, instruction: 'Bật nhảy nhẹ nhàng tăng nhịp tim và làm nóng cơ thể.' }
+      ],
+      mainRoutine: mainList,
+      coolDown: [
+        { name: 'Giãn cơ đùi trước (Quad stretch)', durationSeconds: 45, instruction: 'Đứng 1 chân, kéo gót chân chạm mông thư giãn cơ đùi.' },
+        { name: 'Tư thế đứa trẻ (Child Pose)', durationSeconds: 60, instruction: 'Quỳ gối duỗi dài hai tay về trước giải tỏa áp lực cột sống.' }
+      ],
+      coachTip: 'Uống 300ml nước sau khi tập và bổ sung 25-30g đạm trong vòng 45 phút để cơ bắp phục hồi nhanh nhất.'
+    };
+  }
+}
+

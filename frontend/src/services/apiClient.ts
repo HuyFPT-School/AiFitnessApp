@@ -9,6 +9,8 @@ import {
   WorkoutRoutine
 } from '../types';
 
+import { GeminiService } from './geminiService';
+
 const getApiBaseUrl = (): string => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -203,10 +205,42 @@ export class ApiClient {
     });
   }
 
-  public static async generateRoutine(input: WorkoutRoutineInput): Promise<WorkoutRoutine | null> {
-    return await this.request<WorkoutRoutine>('/ai/generate-routine', {
-      method: 'POST',
-      body: JSON.stringify(input)
-    });
+  public static async generateRoutine(input: WorkoutRoutineInput): Promise<WorkoutRoutine> {
+    try {
+      const res = await this.request<any>('/ai/generate-routine', {
+        method: 'POST',
+        body: JSON.stringify(input)
+      });
+      if (res && (res.mainRoutine || res.mainWorkout)) {
+        return {
+          title: res.title || `Giáo Án Tập Luyện Khoa Học`,
+          goal: res.goal || res.targetGoal || 'Tăng cơ giảm mỡ',
+          level: res.level || res.difficulty || 'Người mới bắt đầu',
+          durationMinutes: Number(res.durationMinutes || res.estimatedDurationMinutes) || input.durationMinutes || 20,
+          estimatedCalories: Number(res.estimatedCalories || res.estimatedCaloriesBurn) || 210,
+          overview: res.overview || 'Giáo án khoa học tối ưu hóa kích hoạt sợi cơ và phục hồi.',
+          warmUp: Array.isArray(res.warmUp) ? res.warmUp : [],
+          mainRoutine: Array.isArray(res.mainRoutine || res.mainWorkout)
+            ? (res.mainRoutine || res.mainWorkout).map((item: any) => ({
+                exerciseId: item.exerciseId || 'squat',
+                exerciseName: item.exerciseName || item.nameVi || item.name || 'Squat (Gánh Đùi)',
+                exerciseNameEn: item.exerciseNameEn || item.nameEn || 'Bodyweight Squat',
+                sets: Number(item.sets) || 3,
+                reps: typeof item.reps === 'number' ? item.reps : parseInt(item.repsOrSeconds || '12', 10) || 12,
+                isHold: item.isHold ?? (item.exerciseId === 'plank' || item.exerciseId === 'warrior_yoga'),
+                restSeconds: Number(item.restSeconds) || 45,
+                formCue: item.formCue || 'Kiểm soát nhịp thở và giữ form chuẩn trong suốt chuyển động.',
+                targetMuscle: item.targetMuscle || 'Toàn thân',
+                gifUrl: item.gifUrl
+              }))
+            : [],
+          coolDown: Array.isArray(res.coolDown) ? res.coolDown : [],
+          coachTip: res.coachTip || 'Bổ sung đủ nước và 25-30g đạm sau buổi tập để phục hồi cơ nạc tốt nhất.'
+        };
+      }
+    } catch (err) {
+      console.warn('Backend generateRoutine error, falling back to GeminiService:', err);
+    }
+    return GeminiService.generatePersonalizedRoutine(input);
   }
 }

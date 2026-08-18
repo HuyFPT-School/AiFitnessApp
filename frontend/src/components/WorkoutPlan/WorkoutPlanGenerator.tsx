@@ -19,7 +19,6 @@ import {
 import { ExerciseInfo, WorkoutRoutine, WorkoutRoutineInput } from '../../types';
 import { ExerciseAnimation } from '../Common/ExerciseAnimation';
 import { ApiClient } from '../../services/apiClient';
-import { EXERCISES } from '../../data/exercises';
 
 interface WorkoutPlanGeneratorProps {
   onStartExerciseInStudio: (exercise: ExerciseInfo, targetReps?: number) => void;
@@ -28,7 +27,7 @@ interface WorkoutPlanGeneratorProps {
 
 export const WorkoutPlanGenerator: React.FC<WorkoutPlanGeneratorProps> = ({
   onStartExerciseInStudio,
-  availableExercises = EXERCISES
+  availableExercises = []
 }) => {
   // Input states
   const [goal, setGoal] = useState<'hypertrophy' | 'hiit' | 'posture' | 'abs' | 'mobility'>('hypertrophy');
@@ -61,12 +60,29 @@ export const WorkoutPlanGenerator: React.FC<WorkoutPlanGeneratorProps> = ({
 
   const handleStartRoutineExercise = (routineEx: any) => {
     // Look for matching exercise in library
-    const matched = availableExercises.find(
-      e =>
-        e.id === routineEx.exerciseId ||
-        e.nameVi.toLowerCase().includes(routineEx.exerciseName?.toLowerCase() || '') ||
-        e.nameEn.toLowerCase().includes(routineEx.exerciseNameEn?.toLowerCase() || '')
-    ) || availableExercises[0];
+    const matched =
+      availableExercises.find(
+        e =>
+          e.id === routineEx.exerciseId ||
+          e.nameVi.toLowerCase().includes(routineEx.exerciseName?.toLowerCase() || '') ||
+          e.nameEn.toLowerCase().includes(routineEx.exerciseNameEn?.toLowerCase() || '')
+      ) ||
+      availableExercises[0] ||
+      ({
+        id: routineEx.exerciseId || 'squat',
+        nameVi: routineEx.exerciseName || 'Bài tập',
+        nameEn: routineEx.exerciseNameEn || 'Exercise',
+        category: 'Full Body',
+        difficulty: 'Trung bình',
+        caloriesPerMinute: 8,
+        targetMuscles: ['Toàn thân'],
+        iconName: 'Activity',
+        description: 'Bài tập trong giáo án AI',
+        keyFormRules: ['Giữ đúng tư thế chuẩn'],
+        commonMistakes: ['Sai form'],
+        defaultTargetReps: 12,
+        cameraAdvice: 'Đứng cách camera 2-3m để AI quét tư thế chuẩn xác.'
+      } as unknown as ExerciseInfo);
 
     const customizedExercise: ExerciseInfo = {
       ...matched,
@@ -381,234 +397,253 @@ export const WorkoutPlanGenerator: React.FC<WorkoutPlanGeneratorProps> = ({
         </div>
       ) : (
         /* STEP 2: ATHLETE-GRADE 3-PHASE ROUTINE VISUALIZATION */
-        <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
-          {/* Routine Summary Card */}
-          <div className="rounded-3xl border border-[#eab308]/40 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)] to-[#eab308]/10 p-6 sm:p-8 shadow-lg space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
-              <div>
-                <span className="rounded-full bg-[#eab308] text-neutral-950 px-2.5 py-0.5 text-[10px] font-extrabold uppercase font-mono tracking-wider">
-                  GIÁO ÁN ĐÃ TẠO THÀNH CÔNG
-                </span>
-                <h2 className="mt-1.5 font-heading text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
-                  {generatedRoutine.title}
-                </h2>
-              </div>
+        (() => {
+          const warmUpList = Array.isArray(generatedRoutine.warmUp) ? generatedRoutine.warmUp : [];
+          const mainList = Array.isArray(generatedRoutine.mainRoutine)
+            ? generatedRoutine.mainRoutine
+            : Array.isArray((generatedRoutine as any).mainWorkout)
+            ? (generatedRoutine as any).mainWorkout
+            : [];
+          const coolDownList = Array.isArray(generatedRoutine.coolDown) ? generatedRoutine.coolDown : [];
 
-              <div className="flex items-center space-x-4">
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-inset)] px-4 py-2 text-center">
-                  <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Thời lượng</span>
-                  <p className="font-mono text-base font-extrabold text-[#ca8a04] dark:text-[#eab308]">
-                    {generatedRoutine.durationMinutes} Phút
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-inset)] px-4 py-2 text-center">
-                  <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Calo đốt cháy</span>
-                  <p className="font-mono text-base font-extrabold text-rose-500">
-                    ~{generatedRoutine.estimatedCalories} kcal
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              {generatedRoutine.overview}
-            </p>
-          </div>
-
-          {/* 3 PHASES */}
-          <div className="space-y-8">
-            {/* GIAI ĐOẠN 1: KHỞI ĐỘNG (WARM-UP) */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 font-black text-sm">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
-                    <span>Giai Đoạn 1: Khởi Động Làm Nóng (Warm-up)</span>
-                    <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400 font-bold font-mono">
-                      ~2-3 Phút
+          return (
+            <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
+              {/* Routine Summary Card */}
+              <div className="rounded-3xl border border-[#eab308]/40 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)] to-[#eab308]/10 p-6 sm:p-8 shadow-lg space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
+                  <div>
+                    <span className="rounded-full bg-[#eab308] text-neutral-950 px-2.5 py-0.5 text-[10px] font-extrabold uppercase font-mono tracking-wider">
+                      GIÁO ÁN ĐÃ TẠO THÀNH CÔNG
                     </span>
-                  </h3>
-                  <p className="text-xs text-[var(--text-muted)]">Bôi trơn các bao hoạt dịch khớp và nâng nhịp tim nhẹ nhàng.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {generatedRoutine.warmUp.map((w, idx) => (
-                  <div
-                    key={idx}
-                    className="card-impeccable p-5 space-y-2 border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60 transition-all"
-                  >
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
-                      <span>Động tác #{idx + 1}</span>
-                      <span className="font-mono">{w.durationSeconds}s</span>
-                    </div>
-                    <h4 className="font-bold text-sm text-[var(--text-primary)]">{w.name}</h4>
-                    <p className="text-xs text-[var(--text-muted)] leading-relaxed">{w.instruction}</p>
+                    <h2 className="mt-1.5 font-heading text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
+                      {generatedRoutine.title || 'Giáo Án Tập Luyện Cá Nhân Hóa AI'}
+                    </h2>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* GIAI ĐOẠN 2: KHỐI BÀI TẬP CHÍNH (MAIN WORKOUT) */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eab308] text-neutral-950 font-black text-sm shadow-md">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
-                    <span>Giai Đoạn 2: Khối Bài Tập Chính (Main Workout Routine)</span>
-                    <span className="rounded-lg bg-[#eab308]/20 px-2 py-0.5 text-xs text-[#ca8a04] dark:text-[#eab308] font-bold font-mono">
-                      AI Vision Tracking
-                    </span>
-                  </h3>
-                  <p className="text-xs text-[var(--text-muted)]">Phân bổ thứ tự bài tập tối ưu kèm nút 1-chạm kết nối Camera AI.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {generatedRoutine.mainRoutine.map((item, idx) => {
-                  const isHoldExercise = item.isHold || item.exerciseId === 'plank' || item.exerciseId === 'warrior_yoga';
-                  const effectiveSets = item.sets && item.sets >= 2 ? item.sets : 3;
-                  const effectiveReps = isHoldExercise
-                    ? item.reps && item.reps >= 15
-                      ? item.reps
-                      : 30
-                    : item.reps && item.reps >= 5
-                    ? item.reps
-                    : 12;
-
-                  return (
-                    <div
-                      key={idx}
-                      className="group relative flex flex-col justify-between rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 transition-all duration-200 hover:border-[#eab308]/60 hover:shadow-xl space-y-4"
-                    >
-                      <div className="flex items-start space-x-4">
-                        {/* 3D GIF preview */}
-                        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white dark:bg-neutral-900 p-1 flex items-center justify-center">
-                          <ExerciseAnimation
-                            exerciseId={item.exerciseId}
-                            exerciseName={item.exerciseName}
-                            gifUrl={item.gifUrl}
-                            size="full"
-                            className="h-full w-full object-contain"
-                          />
-                        </div>
-
-                        {/* Info & Metrics */}
-                        <div className="flex-1 space-y-2 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="rounded-lg bg-[#eab308]/15 px-2 py-0.5 text-[10px] font-bold text-[#ca8a04] dark:text-[#eab308]">
-                              Bài #{idx + 1}
-                            </span>
-                            <span className="text-[11px] font-mono text-[var(--text-muted)] font-semibold">
-                              Nghỉ: {item.restSeconds || 45}s
-                            </span>
-                          </div>
-
-                          <h4 className="font-heading text-base font-bold text-[var(--text-primary)] line-clamp-1">
-                            {item.exerciseName}
-                          </h4>
-                          <p className="text-[11px] text-[var(--text-muted)] font-mono">{item.exerciseNameEn}</p>
-
-                          <div className="flex items-center space-x-2 pt-1">
-                            <span className="rounded-md bg-[var(--bg-surface-inset)] px-2 py-1 text-[11px] font-mono font-bold text-[var(--text-primary)] border border-[var(--border-subtle)]">
-                              {effectiveSets} Hiệp (Sets)
-                            </span>
-                            <span className="rounded-md bg-[#eab308]/20 px-2 py-1 text-[11px] font-mono font-bold text-[#ca8a04] dark:text-[#eab308] border border-[#eab308]/40">
-                              {effectiveReps} {isHoldExercise ? 'giây' : 'reps'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Form Cue */}
-                      <div className="rounded-2xl bg-[var(--bg-surface-inset)] p-3 text-xs border border-[var(--border-subtle)] space-y-1">
-                        <div className="font-bold text-[11px] text-[#0d9488] flex items-center space-x-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Mẹo Form Chuẩn (AI Form Cue):</span>
-                        </div>
-                        <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                          {item.formCue}
-                        </p>
-                      </div>
-
-                      {/* 1-Click Bridge to Camera View */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleStartRoutineExercise({
-                            ...item,
-                            reps: effectiveReps,
-                            sets: effectiveSets,
-                            isHold: isHoldExercise
-                          })
-                        }
-                        className="w-full flex items-center justify-center space-x-2 rounded-2xl bg-[#eab308] hover:bg-[#ca8a04] text-neutral-950 py-3 text-xs font-bold transition-all shadow-md hover:shadow-[#eab308]/25 cursor-pointer font-heading"
-                      >
-                        <Play className="h-4 w-4 fill-current" />
-                        <span>
-                          Tập Với AI Camera ({effectiveReps} {isHoldExercise ? 's' : 'reps'})
-                        </span>
-                      </button>
+                  <div className="flex items-center space-x-4">
+                    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-inset)] px-4 py-2 text-center">
+                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Thời lượng</span>
+                      <p className="font-mono text-base font-extrabold text-[#ca8a04] dark:text-[#eab308]">
+                        {generatedRoutine.durationMinutes || (generatedRoutine as any).estimatedDurationMinutes || 20} Phút
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* GIAI ĐOẠN 3: GIÃN CƠ & HẠ NHIỆT (COOL-DOWN) */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/20 text-teal-500 font-black text-sm">
-                  3
-                </div>
-                <div>
-                  <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
-                    <span>Giai Đoạn 3: Giãn Cơ &amp; Hạ Nhiệt (Cool-down)</span>
-                    <span className="rounded-lg bg-teal-500/15 px-2 py-0.5 text-xs text-teal-600 dark:text-teal-400 font-bold font-mono">
-                      ~2-3 Phút
-                    </span>
-                  </h3>
-                  <p className="text-xs text-[var(--text-muted)]">Kéo giãn tĩnh giải tỏa axit lactic và giảm đau nhức cơ bắp (DOMS).</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {generatedRoutine.coolDown.map((c, idx) => (
-                  <div
-                    key={idx}
-                    className="card-impeccable p-5 space-y-2 border-teal-500/30 bg-teal-500/5 hover:border-teal-500/60 transition-all"
-                  >
-                    <div className="flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-400">
-                      <span>Giãn cơ #{idx + 1}</span>
-                      <span className="font-mono">{c.durationSeconds}s</span>
+                    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-inset)] px-4 py-2 text-center">
+                      <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Calo đốt cháy</span>
+                      <p className="font-mono text-base font-extrabold text-rose-500">
+                        ~{generatedRoutine.estimatedCalories || (generatedRoutine as any).estimatedCaloriesBurn || 210} kcal
+                      </p>
                     </div>
-                    <h4 className="font-bold text-sm text-[var(--text-primary)]">{c.name}</h4>
-                    <p className="text-xs text-[var(--text-muted)] leading-relaxed">{c.instruction}</p>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Coach Tip */}
-            <div className="rounded-3xl border border-[#0d9488]/30 bg-[#0d9488]/10 p-6 flex items-start space-x-4">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0d9488] text-white shadow-md">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-heading text-sm font-bold text-[#0d9488]">
-                  Lời Khuyên Phục Hồi Từ Huấn Luyện Viên AI
-                </h4>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  {generatedRoutine.coachTip}
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+                  {generatedRoutine.overview || 'Giáo án được thiết kế chuyên biệt theo thể trạng và mục tiêu của bạn.'}
                 </p>
               </div>
+
+              {/* 3 PHASES */}
+              <div className="space-y-8">
+                {/* GIAI ĐOẠN 1: KHỞI ĐỘNG (WARM-UP) */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 font-black text-sm">
+                      1
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
+                        <span>Giai Đoạn 1: Khởi Động Làm Nóng (Warm-up)</span>
+                        <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400 font-bold font-mono">
+                          ~2-3 Phút
+                        </span>
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)]">Bôi trơn các bao hoạt dịch khớp và nâng nhịp tim nhẹ nhàng.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {warmUpList.map((w, idx) => (
+                      <div
+                        key={idx}
+                        className="card-impeccable p-5 space-y-2 border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60 transition-all"
+                      >
+                        <div className="flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400">
+                          <span>Động tác #{idx + 1}</span>
+                          <span className="font-mono">{w.durationSeconds || 60}s</span>
+                        </div>
+                        <h4 className="font-bold text-sm text-[var(--text-primary)]">{w.name}</h4>
+                        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{w.instruction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* GIAI ĐOẠN 2: KHỐI BÀI TẬP CHÍNH (MAIN WORKOUT) */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eab308] text-neutral-950 font-black text-sm shadow-md">
+                      2
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
+                        <span>Giai Đoạn 2: Khối Bài Tập Chính (Main Workout Routine)</span>
+                        <span className="rounded-lg bg-[#eab308]/20 px-2 py-0.5 text-xs text-[#ca8a04] dark:text-[#eab308] font-bold font-mono">
+                          AI Vision Tracking
+                        </span>
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)]">Phân bổ thứ tự bài tập tối ưu kèm nút 1-chạm kết nối Camera AI.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {mainList.map((item: any, idx: number) => {
+                      const exerciseName = item.exerciseName || item.nameVi || item.name || 'Bài tập';
+                      const exerciseNameEn = item.exerciseNameEn || item.nameEn || '';
+                      const isHoldExercise = item.isHold || item.exerciseId === 'plank' || item.exerciseId === 'warrior_yoga';
+                      const effectiveSets = item.sets && item.sets >= 2 ? item.sets : 3;
+                      const rawReps = typeof item.reps === 'number' ? item.reps : parseInt(item.repsOrSeconds || '12', 10) || 12;
+                      const effectiveReps = isHoldExercise
+                        ? rawReps >= 15
+                          ? rawReps
+                          : 30
+                        : rawReps >= 5
+                        ? rawReps
+                        : 12;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="group relative flex flex-col justify-between rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 transition-all duration-200 hover:border-[#eab308]/60 hover:shadow-xl space-y-4"
+                        >
+                          <div className="flex items-start space-x-4">
+                            {/* 3D GIF preview */}
+                            <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white dark:bg-neutral-900 p-1 flex items-center justify-center">
+                              <ExerciseAnimation
+                                exerciseId={item.exerciseId}
+                                exerciseName={exerciseName}
+                                gifUrl={item.gifUrl}
+                                size="full"
+                                className="h-full w-full object-contain"
+                              />
+                            </div>
+
+                            {/* Info & Metrics */}
+                            <div className="flex-1 space-y-2 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="rounded-lg bg-[#eab308]/15 px-2 py-0.5 text-[10px] font-bold text-[#ca8a04] dark:text-[#eab308]">
+                                  Bài #{idx + 1}
+                                </span>
+                                <span className="text-[11px] font-mono text-[var(--text-muted)] font-semibold">
+                                  Nghỉ: {item.restSeconds || 45}s
+                                </span>
+                              </div>
+
+                              <h4 className="font-heading text-base font-bold text-[var(--text-primary)] line-clamp-1">
+                                {exerciseName}
+                              </h4>
+                              {exerciseNameEn && (
+                                <p className="text-[11px] text-[var(--text-muted)] font-mono">{exerciseNameEn}</p>
+                              )}
+
+                              <div className="flex items-center space-x-2 pt-1">
+                                <span className="rounded-md bg-[var(--bg-surface-inset)] px-2 py-1 text-[11px] font-mono font-bold text-[var(--text-primary)] border border-[var(--border-subtle)]">
+                                  {effectiveSets} Hiệp (Sets)
+                                </span>
+                                <span className="rounded-md bg-[#eab308]/20 px-2 py-1 text-[11px] font-mono font-bold text-[#ca8a04] dark:text-[#eab308] border border-[#eab308]/40">
+                                  {effectiveReps} {isHoldExercise ? 'giây' : 'reps'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Form Cue */}
+                          <div className="rounded-2xl bg-[var(--bg-surface-inset)] p-3 text-xs border border-[var(--border-subtle)] space-y-1">
+                            <div className="font-bold text-[11px] text-[#0d9488] flex items-center space-x-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Mẹo Form Chuẩn (AI Form Cue):</span>
+                            </div>
+                            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                              {item.formCue || 'Kiểm soát tốc độ và siết chặt cơ bắp trong suốt chuyển động.'}
+                            </p>
+                          </div>
+
+                          {/* 1-Click Bridge to Camera View */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleStartRoutineExercise({
+                                ...item,
+                                exerciseName,
+                                exerciseNameEn,
+                                reps: effectiveReps,
+                                sets: effectiveSets,
+                                isHold: isHoldExercise
+                              })
+                            }
+                            className="w-full flex items-center justify-center space-x-2 rounded-2xl bg-[#eab308] hover:bg-[#ca8a04] text-neutral-950 py-3 text-xs font-bold transition-all shadow-md hover:shadow-[#eab308]/25 cursor-pointer font-heading"
+                          >
+                            <Play className="h-4 w-4 fill-current" />
+                            <span>
+                              Tập Với AI Camera ({effectiveReps} {isHoldExercise ? 's' : 'reps'})
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* GIAI ĐOẠN 3: GIÃN CƠ & HẠ NHIỆT (COOL-DOWN) */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/20 text-teal-500 font-black text-sm">
+                      3
+                    </div>
+                    <div>
+                      <h3 className="font-heading text-xl font-bold text-[var(--text-primary)] flex items-center space-x-2">
+                        <span>Giai Đoạn 3: Giãn Cơ &amp; Hạ Nhiệt (Cool-down)</span>
+                        <span className="rounded-lg bg-teal-500/15 px-2 py-0.5 text-xs text-teal-600 dark:text-teal-400 font-bold font-mono">
+                          ~2-3 Phút
+                        </span>
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)]">Kéo giãn tĩnh giải tỏa axit lactic và giảm đau nhức cơ bắp (DOMS).</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {coolDownList.map((c, idx) => (
+                      <div
+                        key={idx}
+                        className="card-impeccable p-5 space-y-2 border-teal-500/30 bg-teal-500/5 hover:border-teal-500/60 transition-all"
+                      >
+                        <div className="flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-400">
+                          <span>Giãn cơ #{idx + 1}</span>
+                          <span className="font-mono">{c.durationSeconds || 45}s</span>
+                        </div>
+                        <h4 className="font-bold text-sm text-[var(--text-primary)]">{c.name}</h4>
+                        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{c.instruction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Coach Tip */}
+                <div className="rounded-3xl border border-[#0d9488]/30 bg-[#0d9488]/10 p-6 flex items-start space-x-4">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0d9488] text-white shadow-md">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-heading text-sm font-bold text-[#0d9488]">
+                      Lời Khuyên Phục Hồi Từ Huấn Luyện Viên AI
+                    </h4>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                      {generatedRoutine.coachTip || 'Bổ sung nước và dinh dưỡng giàu đạm sau buổi tập để cơ bắp phục hồi tốt nhất.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()
       )}
     </div>
   );

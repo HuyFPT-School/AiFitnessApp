@@ -144,6 +144,7 @@ export function App() {
             selectedExercise={selectedExercise || exercises[0]}
             onSelectExercise={setSelectedExercise}
             onOpenAiCoach={() => setCurrentTab('coach')}
+            availableExercises={exercises}
           />
         )}
 
@@ -158,6 +159,7 @@ export function App() {
           <NutritionScanner
             onStartExercise={handleSelectAndStartExercise}
             currentUser={currentUser}
+            availableExercises={exercises}
           />
         )}
 

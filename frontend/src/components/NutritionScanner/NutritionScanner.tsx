@@ -26,11 +26,11 @@ import {
 } from '../../types';
 import { GeminiService } from '../../services/geminiService';
 import { StorageService } from '../../services/storageService';
-import { EXERCISES } from '../../data/exercises';
 
 interface NutritionScannerProps {
   onStartExercise: (exercise: ExerciseInfo) => void;
   currentUser?: UserProfile | null;
+  availableExercises?: ExerciseInfo[];
 }
 
 type SampleCategory = 'all' | 'high_protein' | 'lean_cut' | 'vietnamese' | 'breakfast';
@@ -57,7 +57,11 @@ const QUICK_SAMPLES: QuickSample[] = [
   { name: 'Sinh tố chuối Whey Protein sữa hạnh nhân', category: 'high_protein', icon: 'smoothie', tag: 'Post-workout', calEst: 290, proteinEst: 30 }
 ];
 
-export const NutritionScanner: React.FC<NutritionScannerProps> = ({ onStartExercise, currentUser }) => {
+export const NutritionScanner: React.FC<NutritionScannerProps> = ({
+  onStartExercise,
+  currentUser,
+  availableExercises = []
+}) => {
   // Input Modes: 'text' | 'camera' | 'upload'
   const [inputMode, setInputMode] = useState<'text' | 'camera' | 'upload'>('text');
   const [textQuery, setTextQuery] = useState('');
@@ -815,7 +819,24 @@ export const NutritionScanner: React.FC<NutritionScannerProps> = ({ onStartExerc
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {scanResult.burnEstimates.slice(0, 3).map((burn, idx) => {
-                    const matchedEx = EXERCISES.find(e => e.id === burn.exerciseId) || EXERCISES[0];
+                    const matchedEx =
+                      availableExercises.find(e => e.id === burn.exerciseId) ||
+                      availableExercises[0] ||
+                      ({
+                        id: burn.exerciseId,
+                        nameVi: burn.exerciseNameVi,
+                        nameEn: burn.exerciseNameVi,
+                        category: 'Full Body',
+                        difficulty: 'Trung bình',
+                        caloriesPerMinute: 8,
+                        targetMuscles: ['Toàn thân'],
+                        iconName: 'Activity',
+                        description: `Bài tập ${burn.exerciseNameVi} giúp đốt cháy calo hiệu quả.`,
+                        keyFormRules: ['Giữ lưng thẳng', 'Kiểm soát nhịp thở'],
+                        commonMistakes: ['Sai tư thế', 'Tập quá nhanh'],
+                        defaultTargetReps: 15,
+                        cameraAdvice: 'Đứng cách camera 2-3m để AI quét tư thế chuẩn xác.'
+                      } as unknown as ExerciseInfo);
                     const scaledMins = Math.round(burn.durationMinutes * portionScale);
                     return (
                       <div

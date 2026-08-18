@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, ChevronLeft, ChevronRight } from 'lucide-react';
-import { EXERCISES } from '../../data/exercises';
+import { ExerciseInfo } from '../../types';
 
-export const HeroAiScannerAnimation: React.FC = () => {
+interface HeroAiScannerAnimationProps {
+  exercises?: ExerciseInfo[];
+}
+
+export const HeroAiScannerAnimation: React.FC<HeroAiScannerAnimationProps> = ({
+  exercises = []
+}) => {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [repCount, setRepCount] = useState(14);
 
-  const currentExercise = EXERCISES[selectedIdx] || EXERCISES[0];
+  const currentExercise = exercises[selectedIdx] || exercises[0];
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -16,12 +22,22 @@ export const HeroAiScannerAnimation: React.FC = () => {
   }, [selectedIdx]);
 
   const handleNext = () => {
-    setSelectedIdx(prev => (prev + 1) % EXERCISES.length);
+    if (exercises.length === 0) return;
+    setSelectedIdx(prev => (prev + 1) % exercises.length);
   };
 
   const handlePrev = () => {
-    setSelectedIdx(prev => (prev - 1 + EXERCISES.length) % EXERCISES.length);
+    if (exercises.length === 0) return;
+    setSelectedIdx(prev => (prev - 1 + exercises.length) % exercises.length);
   };
+
+  if (!currentExercise) {
+    return (
+      <div className="relative w-full max-w-lg lg:max-w-xl mx-auto rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-8 shadow-xl text-center">
+        <div className="h-64 w-full rounded-2xl bg-[var(--bg-canvas)] animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full max-w-lg lg:max-w-xl mx-auto rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 sm:p-6 shadow-xl overflow-hidden flex flex-col space-y-4">
@@ -81,7 +97,7 @@ export const HeroAiScannerAnimation: React.FC = () => {
 
       {/* Exercise Quick Switcher Dots / Mini Tabs */}
       <div className="relative z-10 flex items-center justify-center space-x-1.5 overflow-x-auto py-1 scrollbar-none">
-        {EXERCISES.map((ex, idx) => (
+        {exercises.map((ex, idx) => (
           <button
             key={ex.id}
             onClick={() => setSelectedIdx(idx)}

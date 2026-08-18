@@ -170,7 +170,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Right Column: Interactive AI Scanner Animation */}
           <div className="lg:col-span-5 flex items-center justify-center">
-            <HeroAiScannerAnimation />
+            <HeroAiScannerAnimation exercises={exercises} />
           </div>
         </div>
       </section>

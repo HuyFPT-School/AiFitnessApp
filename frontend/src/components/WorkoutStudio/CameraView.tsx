@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Video,
   Check,
-  X
+  X,
+  Dumbbell
 } from 'lucide-react';
 import { ExerciseInfo, AnalysisFeedback, WorkoutSessionSummary } from '../../types';
 import { poseEngine } from '../../engine/poseEngine';
@@ -22,23 +23,27 @@ import { RealtimeFeedbackBadge } from './RealtimeFeedbackBadge';
 import { WorkoutCompleteModal } from './WorkoutCompleteModal';
 import { ExerciseAnimation } from '../Common/ExerciseAnimation';
 import { CATEGORY_MAP } from '../ExerciseLibrary/ExerciseLibrary';
-import { EXERCISES } from '../../data/exercises';
 
 interface CameraViewProps {
-  selectedExercise: ExerciseInfo;
+  selectedExercise?: ExerciseInfo;
   onSelectExercise: (ex: ExerciseInfo) => void;
   onOpenAiCoach: () => void;
+  availableExercises?: ExerciseInfo[];
 }
 
 export const CameraView: React.FC<CameraViewProps> = ({
-  selectedExercise,
+  selectedExercise: initialSelectedExercise,
   onSelectExercise,
-  onOpenAiCoach
+  onOpenAiCoach,
+  availableExercises = []
 }) => {
+  const selectedExercise = initialSelectedExercise || (availableExercises.length > 0 ? availableExercises[0] : null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | null>(null);
-  const biomechanicsRef = useRef<BiomechanicsEngine>(new BiomechanicsEngine(selectedExercise.id));
+  const biomechanicsRef = useRef<BiomechanicsEngine | null>(
+    selectedExercise ? new BiomechanicsEngine(selectedExercise.id) : null
+  );
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
@@ -61,8 +66,13 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
   // Sync exercise change with BiomechanicsEngine
   useEffect(() => {
-    biomechanicsRef.current.setExercise(selectedExercise.id);
-    biomechanicsRef.current.reset();
+    if (!selectedExercise) return;
+    if (!biomechanicsRef.current) {
+      biomechanicsRef.current = new BiomechanicsEngine(selectedExercise.id);
+    } else {
+      biomechanicsRef.current.setExercise(selectedExercise.id);
+      biomechanicsRef.current.reset();
+    }
     setFeedback(null);
     setDurationSeconds(0);
     setIsWorkoutActive(false);
@@ -130,7 +140,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
   };
 
   const startWorkout = () => {
-    biomechanicsRef.current.reset();
+    if (!selectedExercise) return;
+    biomechanicsRef.current?.reset();
     setDurationSeconds(0);
     setIsWorkoutActive(true);
     audioCoach.speak(`Bắt đầu tập ${selectedExercise.nameVi}!`, true);
@@ -142,7 +153,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
   };
 
   const stopWorkout = useCallback(() => {
-    if (!isWorkoutActive) return;
+    if (!isWorkoutActive || !selectedExercise) return;
     setIsWorkoutActive(false);
 
     if (timerIntervalRef.current) {
@@ -151,12 +162,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
     }
 
     const reps = selectedExercise.isHoldExercise
-      ? biomechanicsRef.current.getHoldSeconds()
-      : biomechanicsRef.current.getRepCount();
+      ? biomechanicsRef.current?.getHoldSeconds() || 0
+      : biomechanicsRef.current?.getRepCount() || 0;
 
-    const avgAccuracy = biomechanicsRef.current.getAverageAccuracy();
-    const mistakes = biomechanicsRef.current.getAllMistakes();
-    const records = biomechanicsRef.current.getRepRecords();
+    const avgAccuracy = biomechanicsRef.current?.getAverageAccuracy() || 0;
+    const mistakes = biomechanicsRef.current?.getAllMistakes() || [];
+    const records = biomechanicsRef.current?.getRepRecords() || [];
 
     // Capture snapshot for analysis
     let snapshotBase64: string | undefined;
@@ -206,7 +217,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
         const now = performance.now();
         const landmarks = poseEngine.detectPoseForVideo(video, now);
 
-        if (landmarks) {
+        if (landmarks && biomechanicsRef.current) {
           // Biomechanics Analysis (Only counts reps & speaks when workout is active)
           const currentFeedback = biomechanicsRef.current.analyzeFrame(landmarks, isWorkoutActiveRef.current);
           setFeedback(currentFeedback);
@@ -246,7 +257,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
   // Auto-finish if target reps reached
   useEffect(() => {
-    if (isWorkoutActive && selectedExercise) {
+    if (isWorkoutActive && selectedExercise && biomechanicsRef.current) {
       const current = selectedExercise.isHoldExercise
         ? biomechanicsRef.current.getHoldSeconds()
         : biomechanicsRef.current.getRepCount();
@@ -257,42 +268,121 @@ export const CameraView: React.FC<CameraViewProps> = ({
     }
   }, [feedback, isWorkoutActive, selectedExercise, stopWorkout]);
 
-  return (
-    <div className="mx-auto flex max-w-[1680px] w-full flex-col space-y-4 p-4 sm:p-8 xl:px-12 animate-in fade-in duration-300">
-      {/* Exercise Selector Bar */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
-        {EXERCISES.map(ex => {
-          const isSelected = ex.id === selectedExercise.id;
-          return (
-            <button
-              key={ex.id}
-              onClick={() => {
-                if (isWorkoutActive) stopWorkout();
-                onSelectExercise(ex);
-              }}
-              className={`flex flex-shrink-0 items-center space-x-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
-                isSelected
-                  ? 'btn-kinpaku text-[#1c1917] shadow-sm scale-[1.02]'
-                  : 'bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border-subtle)] hover:border-[#eab308]/40 hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <span>{ex.nameVi}</span>
-              <span
-                className={`rounded-full px-2 py-0.2 text-[10px] ${
-                  isSelected ? 'bg-[#1c1917]/20 text-[#1c1917]' : 'bg-[var(--bg-canvas)] text-[var(--text-muted)]'
-                }`}
-              >
-                {ex.difficulty}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+  const exerciseList = availableExercises;
 
-      {/* Main Studio Viewport (Video + Overlays) */}
+  // Render Loading state if exercises are still being loaded from MongoDB Atlas
+  if (!selectedExercise) {
+    return (
+      <div className="mx-auto flex max-w-[1720px] w-full min-h-[60vh] flex-col items-center justify-center p-8 text-center space-y-4 animate-in fade-in duration-300">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#eab308]/15 border border-[#eab308]/30 text-[#ca8a04] dark:text-[#eab308] shadow-sm">
+          <Dumbbell className="h-8 w-8 animate-bounce" />
+        </div>
+        <div>
+          <h3 className="font-heading text-xl font-bold text-[var(--text-primary)]">
+            Đang Tải Dữ Liệu Phòng Tập...
+          </h3>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Đang đồng bộ danh sách bài tập từ MongoDB Atlas &amp; Redis Cloud.
+          </p>
+        </div>
+        <div className="h-1.5 w-48 overflow-hidden rounded-full bg-[var(--bg-card)]">
+          <div className="h-full w-full animate-pulse bg-[#eab308]" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex max-w-[1720px] w-full flex-col space-y-4 p-4 sm:p-6 xl:px-8 animate-in fade-in duration-300">
+      {/* Main Studio Viewport (Left Vertical Exercise List + Center Video + Right Info) */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Left / Center Video Screen */}
-        <div className="lg:col-span-8 flex flex-col space-y-3">
+        {/* Left Column: Vertical Exercise Selector (Hàng Dọc) */}
+        <div className="lg:col-span-3 xl:col-span-3 flex flex-col space-y-3 order-2 lg:order-1">
+          <div className="card-impeccable p-4 sm:p-5 flex flex-col space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eab308]/15 text-[#ca8a04] dark:text-[#eab308]">
+                  <Dumbbell className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="font-heading text-xs sm:text-sm font-extrabold text-[var(--text-primary)]">
+                    DANH SÁCH BÀI TẬP
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono">
+                    {exerciseList.length > 0 ? `${exerciseList.length} Bài Tập (MongoDB)` : 'Đang tải từ MongoDB...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Vertical Exercise Cards List */}
+            <div className="flex flex-col space-y-2 max-h-[620px] overflow-y-auto pr-1 scrollbar-thin">
+              {exerciseList.length === 0 ? (
+                <div className="space-y-2.5 py-2">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div
+                      key={i}
+                      className="h-16 rounded-2xl bg-[var(--bg-canvas)] animate-pulse border border-[var(--border-subtle)]"
+                    />
+                  ))}
+                </div>
+              ) : (
+                exerciseList.map(ex => {
+                  const isSelected = selectedExercise && ex.id === selectedExercise.id;
+                  return (
+                    <button
+                      key={ex.id}
+                      onClick={() => {
+                        if (isWorkoutActive) stopWorkout();
+                        onSelectExercise(ex);
+                      }}
+                      className={`flex items-center justify-between rounded-2xl p-3 text-left transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'border-[#eab308] bg-[#eab308]/15 shadow-sm ring-1 ring-[#eab308]/40'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:border-[#eab308]/50 hover:bg-[var(--bg-card)]'
+                      }`}
+                    >
+                      <div className="space-y-0.5 min-w-0 pr-2">
+                        <div className="flex items-center space-x-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                              isSelected ? 'bg-[#eab308] animate-pulse' : 'bg-transparent'
+                            }`}
+                          />
+                          <h4
+                            className={`font-heading text-xs font-bold truncate ${
+                              isSelected ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+                            }`}
+                          >
+                            {ex.nameVi}
+                          </h4>
+                        </div>
+                        <p className="text-[10px] text-[var(--text-muted)] font-mono truncate pl-3">
+                          {ex.nameEn}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end space-y-1 flex-shrink-0">
+                        <span
+                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold font-mono ${
+                            isSelected
+                              ? 'bg-[#eab308] text-neutral-950'
+                              : 'bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                          }`}
+                        >
+                          {ex.difficulty}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Center Video Screen */}
+        <div className="lg:col-span-6 xl:col-span-6 flex flex-col space-y-3 order-1 lg:order-2">
           <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-[var(--border-card)] bg-[var(--bg-card)] shadow-lg flex items-center justify-center">
             {/* Background Subtle Mesh Grid */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(234,179,8,0.05)_0%,transparent_70%)] pointer-events-none" />
@@ -453,8 +543,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
           {/* Metrics Panel */}
           <WorkoutMetrics
             exercise={selectedExercise}
-            repCount={isWorkoutActive ? biomechanicsRef.current.getRepCount() : 0}
-            holdSeconds={isWorkoutActive ? biomechanicsRef.current.getHoldSeconds() : 0}
+            repCount={isWorkoutActive ? biomechanicsRef.current?.getRepCount() || 0 : 0}
+            holdSeconds={isWorkoutActive ? biomechanicsRef.current?.getHoldSeconds() || 0 : 0}
             durationSeconds={isWorkoutActive ? durationSeconds : 0}
             feedback={feedback}
             targetReps={selectedExercise.defaultTargetReps}
@@ -462,7 +552,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
 
         {/* Right Info Sidebar */}
-        <div className="lg:col-span-4 flex flex-col space-y-4">
+        <div className="lg:col-span-3 xl:col-span-3 flex flex-col space-y-4 order-3">
           {/* Exercise Overview Card with Animated Motion Reference */}
           <div className="card-impeccable p-6 space-y-4">
             {/* Animated 3D Reference */}
