@@ -17,8 +17,11 @@ import { ApiClient } from './services/apiClient';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'studio' | 'plan' | 'nutrition' | 'library' | 'coach' | 'history'>('home');
-  const [exercises, setExercises] = useState<ExerciseInfo[]>([]);
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(null);
+  const [exercises, setExercises] = useState<ExerciseInfo[]>(() => StorageService.getCachedExercises());
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseInfo | null>(() => {
+    const cached = StorageService.getCachedExercises();
+    return cached.length > 0 ? cached[0] : null;
+  });
   const [settings, setSettings] = useState<UserSettings>(StorageService.getSettings());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -29,7 +32,7 @@ export function App() {
   const [historyCount, setHistoryCount] = useState(0);
   const [totalCalories, setTotalCalories] = useState(0);
 
-  // Load exercises 100% dynamically from MongoDB Atlas
+  // Load exercises dynamically from MongoDB Atlas & Redis with instant Stale-While-Revalidate caching
   useEffect(() => {
     ApiClient.getExercises().then(res => {
       if (res && Array.isArray(res) && res.length > 0) {
@@ -52,7 +55,12 @@ export function App() {
           gifUrl: item.gifUrl
         }));
         setExercises(formatted);
-        setSelectedExercise(formatted[0]);
+        StorageService.setCachedExercises(formatted);
+        setSelectedExercise(prev => {
+          if (!prev) return formatted[0];
+          const matching = formatted.find(e => e.id === prev.id || e.nameVi === prev.nameVi);
+          return matching || formatted[0];
+        });
       }
     });
   }, []);
@@ -168,6 +176,11 @@ export function App() {
             onSelectAndStart={handleSelectAndStartExercise}
             currentUser={currentUser}
             onOpenCreateExercise={() => setIsCreateExerciseOpen(true)}
+            availableExercises={exercises}
+            onExercisesChanged={(updated) => {
+              setExercises(updated);
+              StorageService.setCachedExercises(updated);
+            }}
           />
         )}
 

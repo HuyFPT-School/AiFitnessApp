@@ -1,4 +1,4 @@
-import { WorkoutHistoryItem, UserSettings, MealLogItem, DailyNutritionSummary, UserProfile } from '../types';
+import { WorkoutHistoryItem, UserSettings, MealLogItem, DailyNutritionSummary, UserProfile, ExerciseInfo } from '../types';
 import { ApiClient } from './apiClient';
 
 const STORAGE_KEYS = {
@@ -288,11 +288,16 @@ export class StorageService {
   }
 
   /**
-   * Sync user history and meals from MongoDB Atlas
+   * Sync user history and meals from MongoDB Atlas (parallel fetch)
    */
   public static async syncFromCloud(): Promise<WorkoutHistoryItem[]> {
     try {
-      const workouts = await ApiClient.getWorkouts();
+      // Fetch workouts and meals in PARALLEL to cut sync time by ~50%
+      const [workouts, meals] = await Promise.all([
+        ApiClient.getWorkouts(),
+        ApiClient.getMeals()
+      ]);
+
       if (workouts && Array.isArray(workouts) && workouts.length > 0) {
         const key = this.getHistoryKey();
         localStorage.setItem(key, JSON.stringify(workouts));
@@ -319,18 +324,49 @@ export class StorageService {
           lastWorkoutDate: (uniqueDates[0] as string) || ''
         };
         localStorage.setItem(this.getStatsKey(), JSON.stringify(stats));
+      }
 
-        const meals = await ApiClient.getMeals();
-        if (meals && Array.isArray(meals)) {
-          const mealsKey = this.getMealsKey();
-          localStorage.setItem(mealsKey, JSON.stringify(meals));
-        }
+      if (meals && Array.isArray(meals)) {
+        const mealsKey = this.getMealsKey();
+        localStorage.setItem(mealsKey, JSON.stringify(meals));
+      }
 
+      if (workouts && Array.isArray(workouts) && workouts.length > 0) {
         return workouts;
       }
     } catch {
       // Ignore
     }
     return this.getHistory();
+  }
+
+  /* ==========================================================================
+     EXERCISES CACHING (STALE-WHILE-REVALIDATE)
+     ========================================================================== */
+  private static readonly EXERCISES_CACHE_KEY = 'aifitcoach_cached_exercises_v1';
+
+  public static getCachedExercises(): ExerciseInfo[] {
+    try {
+      const stored = localStorage.getItem(this.EXERCISES_CACHE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  }
+
+  public static setCachedExercises(exercises: ExerciseInfo[]): void {
+    try {
+      if (Array.isArray(exercises) && exercises.length > 0) {
+        localStorage.setItem(this.EXERCISES_CACHE_KEY, JSON.stringify(exercises));
+      }
+    } catch {
+      // Ignore
+    }
   }
 }

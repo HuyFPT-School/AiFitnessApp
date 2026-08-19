@@ -21,6 +21,8 @@ interface ExerciseLibraryProps {
   onSelectAndStart: (exercise: ExerciseInfo) => void;
   currentUser?: UserProfile | null;
   onOpenCreateExercise?: () => void;
+  availableExercises?: ExerciseInfo[];
+  onExercisesChanged?: (exercises: ExerciseInfo[]) => void;
 }
 
 const CATEGORIES: ('All' | ExerciseCategory)[] = [
@@ -47,18 +49,33 @@ export const CATEGORY_MAP: Record<string, string> = {
 export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
   onSelectAndStart,
   currentUser,
-  onOpenCreateExercise
+  onOpenCreateExercise,
+  availableExercises = [],
+  onExercisesChanged
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<'All' | ExerciseCategory>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalExercise, setActiveModalExercise] = useState<ExerciseInfo | null>(null);
-  const [customExercises, setCustomExercises] = useState<ExerciseInfo[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [localExercises, setLocalExercises] = useState<ExerciseInfo[]>(availableExercises);
+  const [isLoading, setIsLoading] = useState<boolean>(availableExercises.length === 0);
   const [isCreateOrEditModalOpen, setIsCreateOrEditModalOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<ExerciseInfo | null>(null);
 
-  // Fetch exercises 100% from MongoDB Atlas
-  const loadExercises = async () => {
+  // Sync with parent prop when it updates (e.g. after API refresh in App.tsx)
+  useEffect(() => {
+    if (availableExercises.length > 0) {
+      setLocalExercises(availableExercises);
+      setIsLoading(false);
+    }
+  }, [availableExercises]);
+
+  // Only fetch from API if no exercises available (first-time cold start)
+  useEffect(() => {
+    if (availableExercises.length > 0) return;
+    loadExercisesFromApi();
+  }, []);
+
+  const loadExercisesFromApi = async () => {
     setIsLoading(true);
     try {
       const res = await ApiClient.getExercises();
@@ -81,29 +98,28 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
           cameraAdvice: item.cameraAdvice || 'Đứng cách camera 2-3m để AI quan sát toàn thân.',
           gifUrl: item.gifUrl
         }));
-        setCustomExercises(formatted);
+        setLocalExercises(formatted);
+        onExercisesChanged?.(formatted);
       } else {
-        setCustomExercises([]);
+        setLocalExercises([]);
       }
     } catch {
-      setCustomExercises([]);
+      setLocalExercises([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadExercises();
-  }, []);
-
-  const allExercises = customExercises;
+  const allExercises = localExercises;
 
   const handleDeleteExercise = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Bạn có chắc chắn muốn xóa bài tập này khỏi hệ thống không?')) {
       const ok = await ApiClient.deleteExercise(id);
       if (ok) {
-        setCustomExercises(prev => prev.filter(item => (item.id as any) !== id));
+        const updated = localExercises.filter(item => (item.id as any) !== id);
+        setLocalExercises(updated);
+        onExercisesChanged?.(updated);
       }
     }
   };
@@ -445,7 +461,7 @@ export const ExerciseLibrary: React.FC<ExerciseLibraryProps> = ({
         }}
         exerciseToEdit={editingExercise}
         onExerciseCreated={() => {
-          loadExercises();
+          loadExercisesFromApi();
         }}
       />
     </div>

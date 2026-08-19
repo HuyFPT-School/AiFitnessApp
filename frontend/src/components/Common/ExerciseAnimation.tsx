@@ -20,7 +20,9 @@ const LOCAL_GIF_MAP: Record<string, string> = {
   jumping_jack: '/exercises/jumping_jack.gif',
   shoulder_press: '/exercises/shoulder_press.gif',
   warrior_yoga: '/exercises/warrior_yoga.gif',
-  deadlift: '/exercises/deadlift.gif'
+  deadlift: '/exercises/deadlift.gif',
+  romanian_deadlift: '/exercises/deadlift.gif',
+  rdl: '/exercises/deadlift.gif'
 };
 
 const CDN_JSDELIVR = 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos';
@@ -31,17 +33,17 @@ function resolveExerciseKey(id: string, name?: string): string {
   if (LOCAL_GIF_MAP[normalizedId]) return normalizedId;
 
   const text = `${normalizedId} ${(name || '').toLowerCase()}`;
-  if (text.includes('squat') || text.includes('gánh đùi')) return 'squat';
-  if (text.includes('pushup') || text.includes('push-up') || text.includes('hít đất')) return 'pushup';
+  if (text.includes('squat') || text.includes('gánh đùi') || text.includes('ngồi xổm')) return 'squat';
+  if (text.includes('pushup') || text.includes('push-up') || text.includes('hít đất') || text.includes('chống đẩy')) return 'pushup';
   if (text.includes('plank') || text.includes('đo ván')) return 'plank';
-  if (text.includes('lunge') || text.includes('chùng chân')) return 'lunge';
-  if (text.includes('bicep') || text.includes('cuốn tay')) return 'bicep_curl';
-  if (text.includes('jumping') || text.includes('nhảy bật')) return 'jumping_jack';
-  if (text.includes('shoulder') || text.includes('đẩy vai')) return 'shoulder_press';
+  if (text.includes('lunge') || text.includes('chùng chân') || text.includes('bước tới')) return 'lunge';
+  if (text.includes('bicep') || text.includes('cuốn tay') || text.includes('curl')) return 'bicep_curl';
+  if (text.includes('jumping') || text.includes('nhảy bật') || text.includes('jack')) return 'jumping_jack';
+  if (text.includes('shoulder') || text.includes('đẩy vai') || text.includes('press')) return 'shoulder_press';
   if (text.includes('warrior') || text.includes('chiến binh') || text.includes('yoga')) return 'warrior_yoga';
-  if (text.includes('deadlift') || text.includes('rdl') || text.includes('kéo tạ đùi sau')) return 'deadlift';
+  if (text.includes('deadlift') || text.includes('rdl') || text.includes('kéo tạ') || text.includes('đùi sau') || text.includes('romanian')) return 'deadlift';
 
-  return '';
+  return 'squat';
 }
 
 export const ExerciseAnimation: React.FC<ExerciseAnimationProps> = ({

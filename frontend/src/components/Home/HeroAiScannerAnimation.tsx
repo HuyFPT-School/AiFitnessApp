@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ExerciseInfo } from '../../types';
+import { ExerciseAnimation } from '../Common/ExerciseAnimation';
 
 interface HeroAiScannerAnimationProps {
   exercises?: ExerciseInfo[];
@@ -75,11 +76,12 @@ export const HeroAiScannerAnimation: React.FC<HeroAiScannerAnimationProps> = ({
         <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#eab308] to-transparent shadow-[0_0_12px_#eab308] animate-laser-scan pointer-events-none z-20 opacity-80" />
 
         {/* 3D Exercise GIF Animation with Seamless Blend */}
-        <img
-          key={currentExercise.id}
-          src={`/exercises/${currentExercise.id}.gif`}
-          alt={`${currentExercise.nameVi} 3D Animation`}
-          className="gif-harmonized w-full h-full object-contain rounded-xl transition-all duration-300 group-hover:scale-105"
+        <ExerciseAnimation
+          exerciseId={currentExercise.id}
+          exerciseName={`${currentExercise.nameEn} ${currentExercise.nameVi}`}
+          gifUrl={currentExercise.gifUrl}
+          className="w-full h-full border-0 bg-transparent shadow-none"
+          size="full"
         />
 
         {/* Floating Top Angle Badge */}

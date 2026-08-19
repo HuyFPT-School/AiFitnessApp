@@ -12,7 +12,8 @@ import {
   Video,
   Check,
   X,
-  Dumbbell
+  Dumbbell,
+  Search
 } from 'lucide-react';
 import { ExerciseInfo, AnalysisFeedback, WorkoutSessionSummary } from '../../types';
 import { poseEngine } from '../../engine/poseEngine';
@@ -55,6 +56,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
   const [fps, setFps] = useState(0);
   const [completedSession, setCompletedSession] = useState<WorkoutSessionSummary | null>(null);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isWorkoutActiveRef = useRef(false);
   const fpsFramesRef = useRef<number[]>([]);
@@ -270,6 +272,18 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
   const exerciseList = availableExercises;
 
+  const filteredExercises = exerciseList.filter(ex => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      ex.nameVi.toLowerCase().includes(q) ||
+      ex.nameEn.toLowerCase().includes(q) ||
+      ex.category.toLowerCase().includes(q) ||
+      ex.difficulty.toLowerCase().includes(q) ||
+      (ex.targetMuscles && ex.targetMuscles.some(m => m.toLowerCase().includes(q)))
+    );
+  });
+
   // Render Loading state if exercises are still being loaded from MongoDB Atlas
   if (!selectedExercise) {
     return (
@@ -299,24 +313,41 @@ export const CameraView: React.FC<CameraViewProps> = ({
         {/* Left Column: Vertical Exercise Selector (Hàng Dọc) */}
         <div className="lg:col-span-3 xl:col-span-3 flex flex-col space-y-3 order-2 lg:order-1">
           <div className="card-impeccable p-4 sm:p-5 flex flex-col space-y-3">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
               <div className="flex items-center space-x-2.5">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eab308]/15 text-[#ca8a04] dark:text-[#eab308]">
                   <Dumbbell className="h-4 w-4" />
                 </div>
-                <div>
-                  <h3 className="font-heading text-xs sm:text-sm font-extrabold text-[var(--text-primary)]">
-                    DANH SÁCH BÀI TẬP
-                  </h3>
-                  <p className="text-[10px] text-[var(--text-muted)] font-mono">
-                    {exerciseList.length > 0 ? `${exerciseList.length} Bài Tập (MongoDB)` : 'Đang tải từ MongoDB...'}
-                  </p>
-                </div>
+                <h3 className="font-heading text-xs sm:text-sm font-extrabold text-[var(--text-primary)]">
+                  DANH SÁCH BÀI TẬP
+                </h3>
               </div>
             </div>
 
+            {/* Live Search Input Box */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)] pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Tìm bài tập (Squat, Push-up...)"
+                className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] pl-8 pr-8 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[#eab308] focus:outline-none transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
             {/* Vertical Exercise Cards List */}
-            <div className="flex flex-col space-y-2 max-h-[620px] overflow-y-auto pr-1 scrollbar-thin">
+            <div className="flex flex-col space-y-2 max-h-[560px] overflow-y-auto pr-1 scrollbar-thin">
               {exerciseList.length === 0 ? (
                 <div className="space-y-2.5 py-2">
                   {[1, 2, 3, 4, 5, 6].map(i => (
@@ -326,8 +357,20 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     />
                   ))}
                 </div>
+              ) : filteredExercises.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Không tìm thấy bài tập với từ khóa "{searchQuery}"
+                  </p>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="text-[11px] font-bold text-[#ca8a04] dark:text-[#eab308] hover:underline cursor-pointer"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                </div>
               ) : (
-                exerciseList.map(ex => {
+                filteredExercises.map(ex => {
                   const isSelected = selectedExercise && ex.id === selectedExercise.id;
                   return (
                     <button

@@ -24,7 +24,7 @@ const initRedis = (): Redis | null => {
           lazyConnect: true,
           maxRetriesPerRequest: 1,
           enableOfflineQueue: false,
-          connectTimeout: 4000,
+          connectTimeout: 2000,
           retryStrategy: (times: number) => {
             if (times > 3) {
               return null; // Stop retrying after 3 attempts to avoid spamming logs
@@ -39,7 +39,7 @@ const initRedis = (): Redis | null => {
           lazyConnect: true,
           maxRetriesPerRequest: 1,
           enableOfflineQueue: false,
-          connectTimeout: 4000,
+          connectTimeout: 2000,
           retryStrategy: (times: number) => {
             if (times > 3) {
               return null;
