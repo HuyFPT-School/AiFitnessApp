@@ -6,7 +6,8 @@ export type ExerciseId =
   | 'bicep_curl'
   | 'jumping_jack'
   | 'shoulder_press'
-  | 'warrior_yoga';
+  | 'warrior_yoga'
+  | 'deadlift';
 
 export type ExerciseCategory = 'Legs' | 'Chest' | 'Core' | 'Arms' | 'Shoulders' | 'Yoga';
 

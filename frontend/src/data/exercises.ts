@@ -198,5 +198,29 @@ export const EXERCISES: ExerciseInfo[] = [
     isHoldExercise: true,
     idealHoldDurationSec: 30,
     cameraAdvice: 'Đặt máy cách 2.5m nhìn trực diện để thấy toàn bộ sải tay và sải chân chiến binh.'
+  },
+  {
+    id: 'deadlift',
+    nameVi: 'Romanian Deadlift (Kéo Tạ Đùi Sau & Mông)',
+    nameEn: 'Romanian Deadlift (RDL)',
+    category: 'Legs',
+    difficulty: 'Trung bình',
+    caloriesPerMinute: 8,
+    targetMuscles: ['Cơ đùi sau (Hamstrings)', 'Cơ mông (Glutes)', 'Cơ lưng dưới (Lower Back)'],
+    iconName: 'Dumbbell',
+    description: 'Bài tập bản lề hông (Hip Hinge) hàng đầu giúp phát triển cơ đùi sau và săn chắc vòng ba.',
+    keyFormRules: [
+      'Đẩy mông ra sau, giữ đầu gối chùng nhẹ nhưng không hạ như Squat',
+      'Giữ lưng thẳng tuyệt đối suốt chuyển động gập và nâng',
+      'Hạ tạ bám sát cẳng chân đến dưới đầu gối cho tới khi căng cơ đùi sau',
+      'Siết mông và đẩy hông về trước để đứng thẳng'
+    ],
+    commonMistakes: [
+      'Gù cong lưng dưới khi hạ người (nguy hiểm cột sống)',
+      'Trùng gối quá sâu biến bài tập thành Squat',
+      'Để tạ xa người gây áp lực lên thắt lưng'
+    ],
+    defaultTargetReps: 12,
+    cameraAdvice: 'Đặt camera quay góc nghiêng 45 độ cách 2-3m để AI quan sát rõ chuyển động của hông và độ thẳng của lưng.'
   }
 ];

@@ -143,7 +143,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
   const startWorkout = () => {
     if (!selectedExercise) return;
-    biomechanicsRef.current?.reset();
+    if (!biomechanicsRef.current) {
+      biomechanicsRef.current = new BiomechanicsEngine(selectedExercise.id);
+    } else {
+      biomechanicsRef.current.setExercise(selectedExercise.id);
+      biomechanicsRef.current.reset();
+    }
     setDurationSeconds(0);
     setIsWorkoutActive(true);
     audioCoach.speak(`Bắt đầu tập ${selectedExercise.nameVi}!`, true);

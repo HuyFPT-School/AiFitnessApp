@@ -30,7 +30,8 @@ export const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({
   };
 
   const caloriesBurned = Math.round((durationSeconds / 60) * exercise.caloriesPerMinute * 10) / 10;
-  const score = feedback?.score ?? 100;
+  const isWaitingPosition = !feedback || feedback.score === 0 || feedback.phase === 'idle';
+  const score = isWaitingPosition ? 0 : feedback.score;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 w-full">
@@ -73,20 +74,28 @@ export const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({
         <div className="mt-1 flex items-baseline space-x-1 font-mono">
           <span
             className={`font-heading text-3xl sm:text-4xl font-extrabold ${
-              score >= 85
+              isWaitingPosition
+                ? 'text-[var(--text-muted)]'
+                : score >= 85
                 ? 'text-[#0d9488]'
                 : score >= 65
                 ? 'text-amber-600 dark:text-amber-400'
                 : 'text-rose-600 dark:text-rose-400'
             }`}
           >
-            {score}
+            {isWaitingPosition ? '--' : score}
           </span>
-          <span className="text-xs text-[var(--text-muted)] font-semibold">%</span>
+          <span className="text-xs text-[var(--text-muted)] font-semibold">{isWaitingPosition ? '' : '%'}</span>
         </div>
 
         <p className="mt-2 text-[11px] text-[var(--text-secondary)] font-medium">
-          {score >= 85 ? 'Kỹ thuật tối ưu' : score >= 65 ? 'Cần chỉnh góc nhẹ' : 'Lỗi kỹ thuật'}
+          {isWaitingPosition
+            ? 'Đang tìm tư thế...'
+            : score >= 85
+            ? 'Kỹ thuật tối ưu'
+            : score >= 65
+            ? 'Cần chỉnh góc nhẹ'
+            : 'Lỗi kỹ thuật'}
         </p>
       </div>
 

@@ -14,6 +14,7 @@ import { ExerciseInfo, UserSettings, UserProfile } from './types';
 import { StorageService } from './services/storageService';
 import { audioCoach } from './engine/audioCoach';
 import { ApiClient } from './services/apiClient';
+import { normalizeExerciseId } from './engine/biomechanics';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'studio' | 'plan' | 'nutrition' | 'library' | 'coach' | 'history'>('home');
@@ -37,7 +38,7 @@ export function App() {
     ApiClient.getExercises().then(res => {
       if (res && Array.isArray(res) && res.length > 0) {
         const formatted: ExerciseInfo[] = res.map(item => ({
-          id: (item._id || item.id) as any,
+          id: normalizeExerciseId(item.id || item.nameEn || item.nameVi || item._id),
           nameVi: item.nameVi,
           nameEn: item.nameEn,
           category: item.category || 'Legs',

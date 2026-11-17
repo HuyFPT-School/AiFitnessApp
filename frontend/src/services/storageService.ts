@@ -1,5 +1,7 @@
 import { WorkoutHistoryItem, UserSettings, MealLogItem, DailyNutritionSummary, UserProfile, ExerciseInfo } from '../types';
 import { ApiClient } from './apiClient';
+import { EXERCISES } from '../data/exercises';
+import { normalizeExerciseId } from '../engine/biomechanics';
 
 const STORAGE_KEYS = {
   SETTINGS: 'aifitcoach_settings_v1',
@@ -343,27 +345,34 @@ export class StorageService {
   /* ==========================================================================
      EXERCISES CACHING (STALE-WHILE-REVALIDATE)
      ========================================================================== */
-  private static readonly EXERCISES_CACHE_KEY = 'aifitcoach_cached_exercises_v1';
+  private static readonly EXERCISES_CACHE_KEY = 'aifitcoach_cached_exercises_v2';
 
   public static getCachedExercises(): ExerciseInfo[] {
     try {
-      const stored = localStorage.getItem(this.EXERCISES_CACHE_KEY);
+      const stored = localStorage.getItem(this.EXERCISES_CACHE_KEY) || localStorage.getItem('aifitcoach_cached_exercises_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((item: any) => ({
+            ...item,
+            id: normalizeExerciseId(item.id || item.nameEn || item.nameVi || item._id)
+          }));
         }
       }
     } catch {
       // Ignore
     }
-    return [];
+    return EXERCISES;
   }
 
   public static setCachedExercises(exercises: ExerciseInfo[]): void {
     try {
       if (Array.isArray(exercises) && exercises.length > 0) {
-        localStorage.setItem(this.EXERCISES_CACHE_KEY, JSON.stringify(exercises));
+        const normalized = exercises.map(item => ({
+          ...item,
+          id: normalizeExerciseId(item.id || item.nameEn || item.nameVi)
+        }));
+        localStorage.setItem(this.EXERCISES_CACHE_KEY, JSON.stringify(normalized));
       }
     } catch {
       // Ignore

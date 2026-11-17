@@ -90,6 +90,22 @@ export function calculateTorsoInclination(shoulder: Landmark, hip: Landmark): nu
   return Math.round((angleRad * 180.0) / Math.PI);
 }
 
+/**
+ * Normalizes any exercise ID, ObjectId or name string to valid ExerciseId
+ */
+export function normalizeExerciseId(rawIdOrName?: string): ExerciseId {
+  const s = (rawIdOrName || '').toLowerCase().trim();
+  if (s.includes('deadlift') || s.includes('rdl') || s.includes('kéo tạ') || s.includes('keo ta') || s.includes('đùi sau') || s.includes('dui sau')) return 'deadlift';
+  if (s === 'shoulder_press' || s.includes('shoulder') || s.includes('đẩy vai') || s.includes('day vai') || s.includes('press')) return 'shoulder_press';
+  if (s === 'pushup' || s.includes('pushup') || s.includes('push-up') || s.includes('hít đất') || s.includes('hit dat')) return 'pushup';
+  if (s === 'plank' || s.includes('plank') || s.includes('đo ván') || s.includes('do van')) return 'plank';
+  if (s === 'lunge' || s.includes('lunge') || s.includes('chùng chân') || s.includes('chung chan')) return 'lunge';
+  if (s === 'bicep_curl' || s.includes('bicep') || s.includes('curl') || s.includes('tay trước') || s.includes('tay truoc')) return 'bicep_curl';
+  if (s === 'jumping_jack' || s.includes('jumping') || s.includes('nhảy bật') || s.includes('nhay bat')) return 'jumping_jack';
+  if (s === 'warrior_yoga' || s.includes('warrior') || s.includes('yoga') || s.includes('chiến binh') || s.includes('chien binh')) return 'warrior_yoga';
+  return 'squat';
+}
+
 export class BiomechanicsEngine {
   private exerciseType: ExerciseId = 'squat';
   private stage: ExercisePhase = 'idle';
@@ -105,13 +121,27 @@ export class BiomechanicsEngine {
   private maxPrimaryAngleDuringRep: number = 0;
   private lastWarningSpokenTime: number = 0;
 
-  constructor(exerciseId: ExerciseId = 'squat') {
+  constructor(exerciseId: string = 'squat') {
     this.setExercise(exerciseId);
   }
 
-  public setExercise(exerciseId: ExerciseId) {
-    this.exerciseType = exerciseId;
+  public setExercise(exerciseId: string) {
+    this.exerciseType = normalizeExerciseId(exerciseId);
     this.reset();
+  }
+
+  public getExerciseType(): ExerciseId {
+    return this.exerciseType;
+  }
+
+  private checkJointsVisible(landmarks: Landmark[], indices: number[], minVisibility: number = 0.25): boolean {
+    for (const idx of indices) {
+      const lm = landmarks[idx];
+      if (!lm) return false;
+      if (lm.visibility !== undefined && lm.visibility < minVisibility) return false;
+      if (lm.x < -0.25 || lm.x > 1.25 || lm.y < -0.25 || lm.y > 1.25) return false;
+    }
+    return true;
   }
 
   public reset() {
@@ -300,12 +330,30 @@ export class BiomechanicsEngine {
         return this.analyzeShoulderPress(landmarks, angles);
       case 'warrior_yoga':
         return this.analyzeWarriorYoga(landmarks, angles);
+      case 'deadlift':
+        return this.analyzeDeadlift(landmarks, angles);
       default:
         return this.analyzeSquat(landmarks, angles);
     }
   }
 
   private analyzeSquat(landmarks: Landmark[], angles: JointAngles): AnalysisFeedback {
+    const hasHips = this.checkJointsVisible(landmarks, [POSE_LANDMARKS.LEFT_HIP, POSE_LANDMARKS.RIGHT_HIP]);
+    const hasKnees = this.checkJointsVisible(landmarks, [POSE_LANDMARKS.LEFT_KNEE]) || this.checkJointsVisible(landmarks, [POSE_LANDMARKS.RIGHT_KNEE]);
+
+    if (!hasHips || !hasKnees) {
+      return {
+        text: '⚠️ Hãy lùi ra xa (2-3m) để camera thấy rõ toàn bộ hông và đầu gối!',
+        status: 'warning',
+        score: 0,
+        repCount: this.repCount,
+        phase: 'idle',
+        keyAngles: {},
+        errorsDetected: ['Không thấy rõ hông và đầu gối trong khung hình'],
+        guidanceTip: 'Mẹo: Đặt camera ngang tầm thắt lưng và lùi lại để AI quan sát toàn bộ thân dưới.'
+      };
+    }
+
     const avgKnee = ((angles.leftKnee || 180) + (angles.rightKnee || 180)) / 2;
     const errors: string[] = [];
     let score = 100;
@@ -609,27 +657,53 @@ export class BiomechanicsEngine {
   }
 
   private analyzeShoulderPress(landmarks: Landmark[], angles: JointAngles): AnalysisFeedback {
+    const hasShoulder = this.checkJointsVisible(landmarks, [POSE_LANDMARKS.LEFT_SHOULDER], 0.2) ||
+                        this.checkJointsVisible(landmarks, [POSE_LANDMARKS.RIGHT_SHOULDER], 0.2);
+
+    if (!hasShoulder) {
+      return {
+        text: '⚠️ Hãy lùi lại một chút để camera thấy rõ vai và hai cánh tay!',
+        status: 'warning',
+        score: 0,
+        repCount: this.repCount,
+        phase: 'idle',
+        keyAngles: {},
+        errorsDetected: ['Không thấy rõ vai và cánh tay trong khung hình'],
+        guidanceTip: 'Mẹo: Ngồi hoặc đứng cách camera khoảng 1.5 - 2m thấy rõ hai cánh tay.'
+      };
+    }
+
     const avgElbow = ((angles.leftElbow || 180) + (angles.rightElbow || 180)) / 2;
     let text = 'Đẩy thẳng tạ lên qua đầu';
     let status: 'good' | 'warning' | 'bad' = 'good';
     const errors: string[] = [];
-    const score = 100;
+    let score = 100;
 
-    if (avgElbow > 160) {
+    this.minPrimaryAngleDuringRep = Math.min(this.minPrimaryAngleDuringRep, avgElbow);
+    this.maxPrimaryAngleDuringRep = Math.max(this.maxPrimaryAngleDuringRep, avgElbow);
+
+    if (avgElbow < 110) {
+      this.stage = 'down';
+      text = 'Đẩy mạnh lên trên đỉnh đầu';
+      status = 'good';
+    } else if (avgElbow > 145) {
       if (this.stage === 'down') {
-        this.triggerRepFinish(score);
+        const finalScore = this.minPrimaryAngleDuringRep <= 100 ? score : Math.max(50, score - 20);
+        this.triggerRepFinish(finalScore);
       }
       this.stage = 'up';
       text = '✓ Đẩy hết tầm! Hạ khuỷu tay ngang vai';
-    } else if (avgElbow < 90) {
-      this.stage = 'down';
-      text = 'Đẩy mạnh lên trên đỉnh đầu';
+      status = 'good';
+    } else if (this.stage === 'down') {
+      text = 'Đang đẩy lên... duỗi thẳng khuỷu tay';
+    } else if (this.stage === 'up') {
+      text = 'Hạ có kiểm soát xuống ngang cằm';
     }
 
     return {
       text,
       status,
-      score,
+      score: Math.max(20, score),
       repCount: this.repCount,
       phase: this.stage === 'up' ? 'up' : 'down',
       keyAngles: {
@@ -638,6 +712,83 @@ export class BiomechanicsEngine {
       },
       errorsDetected: errors,
       guidanceTip: 'Mẹo: Giữ thân người ổn định, không ưỡn thắt lưng.'
+    };
+  }
+
+  private analyzeDeadlift(landmarks: Landmark[], angles: JointAngles): AnalysisFeedback {
+    const hasHips = this.checkJointsVisible(landmarks, [POSE_LANDMARKS.LEFT_HIP], 0.2) ||
+                    this.checkJointsVisible(landmarks, [POSE_LANDMARKS.RIGHT_HIP], 0.2);
+
+    if (!hasHips) {
+      return {
+        text: '⚠️ Hãy lùi ra xa (2-3m) để camera thấy rõ từ hông xuống chân!',
+        status: 'warning',
+        score: 0,
+        repCount: this.repCount,
+        phase: 'idle',
+        keyAngles: {},
+        errorsDetected: ['Không thấy rõ hông và chân trong khung hình'],
+        guidanceTip: 'Mẹo: Đặt camera quay góc nghiêng 45 độ để thấy rõ hông và lưng.'
+      };
+    }
+
+    const avgHip = ((angles.leftHip || 180) + (angles.rightHip || 180)) / 2;
+    const avgKnee = ((angles.leftKnee || 180) + (angles.rightKnee || 180)) / 2;
+    const errors: string[] = [];
+    let score = 100;
+    let text = 'Đứng thẳng, chuẩn bị gập hông ra sau';
+    let status: 'good' | 'warning' | 'bad' = 'good';
+
+    this.minPrimaryAngleDuringRep = Math.min(this.minPrimaryAngleDuringRep, avgHip);
+    this.maxPrimaryAngleDuringRep = Math.max(this.maxPrimaryAngleDuringRep, avgHip);
+
+    if (angles.spineStraightness && angles.spineStraightness < 140) {
+      errors.push('Cong lưng dưới (nguy hiểm cột sống)');
+      this.currentRepMistakes.add('Giữ lưng thẳng tuyệt đối');
+      score -= 25;
+      this.warn('Khóa chặt cơ lưng, không cong cột sống');
+    }
+
+    if (avgKnee < 130) {
+      errors.push('Trùng gối quá nhiều (đang thành Squat)');
+      this.currentRepMistakes.add('Chỉ gập hông, gối chỉ hơi chùng nhẹ');
+      score -= 15;
+    }
+
+    if (avgHip > 155) {
+      if (this.stage === 'down') {
+        const finalScore = this.minPrimaryAngleDuringRep <= 115 ? score : Math.max(50, score - 20);
+        this.triggerRepFinish(finalScore);
+      }
+      this.stage = 'up';
+      text = 'Đẩy mông ra sau, giữ lưng thẳng hạ tạ';
+      status = 'good';
+    } else if (avgHip < 115) {
+      this.stage = 'down';
+      text = '✓ Căng đùi sau tối đa! Siết mông đứng thẳng lên';
+      status = 'good';
+    } else if (this.stage === 'up' && avgHip < 145) {
+      text = 'Đang hạ tạ... Đẩy hông ra sau, mắt nhìn chéo xuống';
+    }
+
+    if (errors.length > 0) {
+      status = 'warning';
+      text = `⚠️ ${errors[0]}!`;
+    }
+
+    return {
+      text,
+      status,
+      score: Math.max(20, score),
+      repCount: this.repCount,
+      phase: this.stage === 'down' ? 'down' : 'up',
+      keyAngles: {
+        leftHip: angles.leftHip,
+        rightHip: angles.rightHip,
+        leftKnee: angles.leftKnee
+      },
+      errorsDetected: errors,
+      guidanceTip: 'Mẹo: Tưởng tượng dùng mông đẩy cánh cửa phía sau đóng lại.'
     };
   }
 
