@@ -38,6 +38,10 @@ const executeGeminiRequest = async (payload: any, apiKey: string): Promise<any> 
 export const analyzeWorkout = async (req: Request, res: Response): Promise<void> => {
   try {
     const { session } = req.body;
+    if (!session) {
+      res.status(400).json({ success: false, message: 'Session data is required' });
+      return;
+    }
     const apiKey = getApiKey();
 
     const prompt = `
@@ -234,7 +238,6 @@ DANH SÁCH BÀI TẬP CÓ SẴN TRONG HỆ THỐNG:
 - 'jumping_jack': Jumping Jack (Nhảy Bật Tay Chân)
 - 'shoulder_press': Shoulder Press (Đẩy Vai)
 - 'warrior_yoga': Warrior II (Tư Thế Chiến Binh Yoga)
-- 'deadlift': Romanian Deadlift (Kéo Tạ Đùi Sau & Mông)
 
 YÊU CẦU TRẢ VỀ JSON CHÍNH XÁC (Strict JSON):
 {
@@ -426,6 +429,81 @@ YÊU CẦU TRẢ VỀ JSON CHÍNH XÁC (Strict JSON):
         coachTip: 'Uống 300ml nước sau khi tập và bổ sung 25-30g đạm trong vòng 45 phút để cơ bắp phục hồi nhanh nhất.'
       }
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Server-side AI Coach Chat
+// @route   POST /api/ai/chat
+export const chatWithCoach = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { history = [], message } = req.body;
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ success: false, message: 'Message is required' });
+      return;
+    }
+
+    const apiKey = getApiKey();
+    const systemInstruction = {
+      parts: [
+        {
+          text: `Bạn là AI FitCoach - Huấn luyện viên Thể hình, Giảng viên Sinh cơ học & Chuyên gia Dinh dưỡng AI cá nhân số 1 Việt Nam (chuẩn quốc tế NASM, NSCA, ISSA).
+Nhiệm vụ của bạn là tư vấn chi tiết, khoa học và sâu sắc cho mọi thắc mắc của học viên (kỹ thuật từng bài tập, mẹo bảo vệ khớp và cột sống, cách chọn động tác an toàn, chế độ ăn tăng cơ giảm mỡ...).
+
+Quy tắc trả lời:
+- Luôn trả lời đầy đủ, chi tiết, giải thích rõ nguyên nhân cơ chế sinh học và đưa ra giải pháp từng bước cụ thể (Step-by-step).
+- Liệt kê các bài tập rõ ràng với tên bài tập, cách thực hiện chuẩn, và mẹo giữ an toàn cho cột sống / khớp.
+- Sử dụng tiếng Việt chuẩn mực, có emoji thể thao sinh động (💪, 🏋️, 🔥, 🥗, 🛡️, ✨).
+- Không trả lời ngắn cụt hay chung chung. Hãy là một người thầy, một HLV tận tâm và thông thái.`
+        }
+      ]
+    };
+
+    const filteredHistory = Array.isArray(history)
+      ? history.filter((m: any) => m && m.id !== 'welcome' && m.id !== 'welcome_reset')
+      : [];
+    const contents: any[] = [];
+
+    for (const msg of filteredHistory.slice(-8)) {
+      const role = msg.sender === 'user' ? 'user' : 'model';
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        continue;
+      }
+      contents.push({
+        role,
+        parts: [{ text: msg.text || '' }]
+      });
+    }
+
+    if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+      contents[contents.length - 1].parts = [{ text: message }];
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [{ text: message }]
+      });
+    }
+
+    const data = await executeGeminiRequest(
+      {
+        systemInstruction,
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1500
+        }
+      },
+      apiKey
+    );
+
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (reply) {
+      res.json({ success: true, data: { reply } });
+      return;
+    }
+
+    res.status(500).json({ success: false, message: 'Could not generate coach response' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

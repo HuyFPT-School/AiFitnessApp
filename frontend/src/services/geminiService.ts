@@ -136,6 +136,16 @@ YÊU CẦU TRẢ VỀ JSON CHÍNH XÁC:
     history: ChatMessage[],
     userMessage: string
   ): Promise<string> {
+    // 1. Try Backend Proxy First
+    try {
+      const backendReply = await ApiClient.chatWithCoach(history, userMessage);
+      if (backendReply) {
+        return backendReply;
+      }
+    } catch {
+      // Fallback to client-side direct Gemini
+    }
+
     const apiKey = this.getApiKey();
 
     const systemInstruction = {
@@ -563,7 +573,6 @@ BÀI TẬP CÓ SẴN TRONG HỆ THỐNG AI:
 - 'jumping_jack': Jumping Jack (Nhảy Bật Tay Chân)
 - 'shoulder_press': Shoulder Press (Đẩy Vai)
 - 'warrior_yoga': Warrior II (Chiến Binh Yoga)
-- 'deadlift': Romanian Deadlift (Kéo Tạ Đùi Sau & Mông)
 
 TRẢ VỀ JSON DUY NHẤT THEO SCHEMA:
 {
@@ -717,16 +726,16 @@ TRẢ VỀ JSON DUY NHẤT THEO SCHEMA:
           gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/1775-VO2qeJg.gif'
         },
         {
-          exerciseId: 'deadlift',
-          exerciseName: 'Romanian Deadlift (Kéo Tạ Đùi Sau)',
-          exerciseNameEn: 'Romanian Deadlift',
+          exerciseId: 'squat',
+          exerciseName: 'Squat (Gánh Đùi Thân Dưới)',
+          exerciseNameEn: 'Bodyweight Squat',
           sets: 3,
-          reps: 12,
+          reps: 15,
           isHold: false,
-          restSeconds: 50,
-          formCue: 'Đẩy mông ra sau, giữ lưng thẳng tuyệt đối, cảm nhận căng cơ đùi sau.',
-          targetMuscle: 'Cơ đùi sau & Cơ mông',
-          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0401-yG0vK4Q.gif'
+          restSeconds: 45,
+          formCue: 'Đẩy gối theo hướng mũi chân, ngực ưỡn thẳng và hạ đùi song song mặt sàn.',
+          targetMuscle: 'Cơ đùi trước & Cơ mông',
+          gifUrl: 'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/3220-f9lVSSI.gif'
         }
       ];
     } else if (isCore) {

@@ -205,6 +205,14 @@ export class ApiClient {
     });
   }
 
+  public static async chatWithCoach(history: any[], message: string): Promise<string | null> {
+    const res = await this.request<{ reply: string }>('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ history, message })
+    });
+    return res?.reply || null;
+  }
+
   public static async generateRoutine(input: WorkoutRoutineInput): Promise<WorkoutRoutine> {
     try {
       const res = await this.request<any>('/ai/generate-routine', {

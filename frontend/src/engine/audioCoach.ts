@@ -174,25 +174,36 @@ class AudioCoach {
 
     const lang = this.currentLanguage || 'vi_nam';
 
-    // 1. Primary Method: Neural AI TTS Stream (FastAPI or Node Proxy)
-    const neuralUrl = `http://localhost:5050/api/ai/tts-neural?text=${encodeURIComponent(
-      text.slice(0, 200)
-    )}&voice=${encodeURIComponent(lang)}&speed=${this.voiceSpeed}`;
+    // 1. Primary Method: Neural AI TTS Stream via API Proxy
+    const apiBase = (import.meta as any).env?.VITE_API_URL
+      ? (import.meta as any).env.VITE_API_URL
+      : typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:5050/api'
+      : '';
 
-    try {
-      const audio = new Audio(neuralUrl);
-      this.currentAudioElement = audio;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.warn('Neural TTS play failed, trying direct Google TTS fallback:', err);
-          this.speakViaDirectGoogleTTS(text, lang);
-        });
+    if (apiBase) {
+      const neuralUrl = `${apiBase}/ai/tts-neural?text=${encodeURIComponent(
+        text.slice(0, 200)
+      )}&voice=${encodeURIComponent(lang)}&speed=${this.voiceSpeed}`;
+
+      try {
+        const audio = new Audio(neuralUrl);
+        this.currentAudioElement = audio;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            console.warn('Neural TTS play failed, trying direct Google TTS fallback:', err);
+            this.speakViaDirectGoogleTTS(text, lang);
+          });
+        }
+        return;
+      } catch {
+        this.speakViaDirectGoogleTTS(text, lang);
+        return;
       }
-      return;
-    } catch {
-      this.speakViaDirectGoogleTTS(text, lang);
     }
+
+    this.speakViaDirectGoogleTTS(text, lang);
   }
 
   private speakViaDirectGoogleTTS(text: string, lang: string) {
